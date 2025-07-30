@@ -1,115 +1,120 @@
-# Epubizon - EPUB & PDF Reader
+# 📚 Epubizon - EPUB & PDF Reader
 
-A modern desktop application for reading EPUB and PDF files with AI-powered chapter summaries.
+Uma aplicação desktop moderna em Python para leitura de arquivos EPUB e PDF com resumos alimentados por IA.
 
-## Features
+## ✨ Recursos
 
-- 📚 **EPUB & PDF Support** - Read both EPUB and PDF files
-- 🖼️ **Image Display** - Proper image loading and display for illustrated books
-- 🤖 **AI Summaries** - Generate chapter summaries using OpenAI API
-- ⌨️ **Keyboard Navigation** - Navigate with arrow keys and shortcuts
-- 📱 **Large File Optimization** - Efficient handling of books with 1000+ pages
-- 🎨 **Modern Interface** - Clean, responsive design
+- 📚 **Suporte EPUB & PDF** - Leia arquivos EPUB e PDF
+- 🤖 **Resumos com IA** - Gere resumos de capítulos usando OpenAI API
+- ⌨️ **Navegação por Teclado** - Navegue com setas e atalhos
+- 🎨 **Interface Moderna** - Design limpo e responsivo
+- 📖 **Navegação por Capítulos** - Salte diretamente para qualquer capítulo
+- 🖼️ **Processamento de Imagens** - Suporte completo para imagens em EPUBs
+- ⚙️ **Configurações Avançadas** - Personalize fontes, temas e mais
 
-## Installation
+## 🚀 Instalação
 
-1. Clone the repository:
+### Pré-requisitos
+- Python 3.8+ 
+- pip
+
+### Passos
+
+1. **Clone o repositório:**
 ```bash
 git clone <repository-url>
 cd epubizon
 ```
 
-2. Install dependencies:
+2. **Crie um ambiente virtual:**
 ```bash
-npm install
+python3 -m venv venv
+source venv/bin/activate  # Linux/macOS
+# ou
+venv\\Scripts\\activate     # Windows
 ```
 
-3. Run the application:
+3. **Instale as dependências:**
 ```bash
-npm start
+pip install -r requirements.txt
 ```
 
-For development with DevTools:
+4. **Execute a aplicação:**
 ```bash
-npm run dev
+python main.py
 ```
 
-## Usage
+## 📖 Como Usar
 
-1. **Open a file**: Click "Open File" and select an EPUB or PDF
-2. **Navigate**: Use arrow keys or click navigation buttons
-3. **Chapter jumping**: Click on chapters in the sidebar
-4. **AI Summaries**: Set your OpenAI API key in Settings, then click "Summarize Chapter"
+1. **Abrir arquivo**: Clique em "📂 Abrir Arquivo" ou pressione `Ctrl+O`
+2. **Navegar**: Use as setas do teclado ou clique nos botões de navegação
+3. **Pular capítulos**: Clique nos capítulos na barra lateral
+4. **Resumos com IA**: Configure sua chave OpenAI nas configurações, depois pressione `F1`
 
-## Keyboard Shortcuts
+## ⌨️ Atalhos de Teclado
 
-- `←` Previous page
-- `→` Next page  
-- `↑` Next chapter
-- `↓` Previous chapter
-- `S` Summarize current chapter
+- `←` / `→` - Navegar entre capítulos
+- `↑` / `↓` - Navegar entre capítulos  
+- `F1` - Resumir capítulo atual
+- `Ctrl+O` - Abrir arquivo
+- `Ctrl+,` - Abrir configurações
+- `Ctrl+Q` - Sair da aplicação
 
-## Build
+## ⚙️ Configuração
 
-To build the application for distribution:
+### Chave da API OpenAI
 
-```bash
-npm run build
-```
+Para usar resumos com IA:
 
-For Windows specifically:
-```bash
-npm run build:win
-```
+1. Obtenha uma chave da API em [OpenAI](https://platform.openai.com/api-keys)
+2. Abra as Configurações na aplicação
+3. Insira sua chave da API
+4. Salve as configurações
 
-## Maintenance
+A chave é armazenada localmente e usada apenas para gerar resumos.
 
-### Clean build artifacts:
-```bash
-npm run clean
-```
-
-### Complete reset (clean + reinstall dependencies):
-```bash
-npm run reset
-```
-
-## Configuration
-
-### OpenAI API Key
-To use AI-powered summaries, you need to:
-1. Get an API key from [OpenAI](https://platform.openai.com/api-keys)
-2. Open Settings in the app
-3. Enter your API key
-4. Save settings
-
-The API key is stored locally and only used for generating summaries.
-
-## Project Structure
+## 📁 Estrutura do Projeto
 
 ```
 epubizon/
-├── src/
-│   ├── main.js           # Electron main process
-│   ├── preload.js        # Secure IPC bridge
-│   ├── index.html        # Main UI
-│   ├── styles.css        # UI styling
-│   ├── renderer.js       # Main app logic
-│   ├── keyboard-handler.js # Keyboard navigation
-│   ├── epub-handler.js   # EPUB file processing
-│   └── pdf-handler.js    # PDF file processing
-├── package.json          # Project configuration
-└── README.md            # This file
+├── main.py              # Aplicação principal
+├── epub_handler.py      # Processamento de arquivos EPUB
+├── pdf_handler.py       # Processamento de arquivos PDF
+├── ai_summarizer.py     # Integração com OpenAI
+├── settings_manager.py  # Gerenciamento de configurações
+├── settings_dialog.py   # Interface de configurações
+├── requirements.txt     # Dependências Python
+├── venv/               # Ambiente virtual
+└── README.md           # Este arquivo
 ```
 
-## Technical Details
+## 🔧 Dependências
 
-- **Framework**: Electron
-- **EPUB Processing**: epub.js
-- **PDF Processing**: PDF.js
-- **AI Integration**: OpenAI API
-- **Image Handling**: Blob URLs with proper resource management
+- **ebooklib** - Processamento de arquivos EPUB
+- **PyPDF2** - Processamento de arquivos PDF  
+- **Pillow** - Processamento de imagens
+- **openai** - Integração com OpenAI API
+- **beautifulsoup4** - Parsing de HTML/XML
+- **tkinter** - Interface gráfica (incluída no Python)
 
-## License
+## 🤝 Contribuindo
 
-MIT
+1. Faça um fork do projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
+
+## 📝 Licença
+
+MIT - veja o arquivo LICENSE para detalhes.
+
+## 🆕 Changelog
+
+### v2.0.0
+- ✅ Reescrito completamente em Python (era Electron)
+- ✅ Interface nativa com tkinter
+- ✅ Melhor performance e menor uso de memória
+- ✅ Suporte completo para navegação por capítulos
+- ✅ Design moderno e responsivo
+- ✅ Configurações avançadas

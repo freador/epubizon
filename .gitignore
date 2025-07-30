@@ -1,122 +1,94 @@
-# Dependencies
-node_modules/
-jspm_packages/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-.npm
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+pyvenv.cfg
 
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
+# PyInstaller
+*.manifest
+*.spec
 
-# Coverage directory used by tools like istanbul
-coverage/
-*.lcov
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
 
-# nyc test coverage
-.nyc_output
+# Jupyter Notebook
+.ipynb_checkpoints
 
-# Grunt intermediate storage
-.grunt
+# IPython
+profile_default/
+ipython_config.py
 
-# Bower dependency directory
-bower_components
-
-# node-waf configuration
-.lock-wscript
-
-# Compiled binary addons
-build/Release
-
-# Dependency directories
-node_modules/
-jspm_packages/
-
-# TypeScript cache
-*.tsbuildinfo
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# dotenv environment variables file
+# Environment variables
 .env
+.env.local
+.env.development
 .env.test
 .env.production
+.env.development.local
+.env.test.local
+.env.production.local
 
-# parcel-bundler cache
-.cache
-.parcel-cache
-
-# Next.js build output
-.next
-
-# Nuxt.js build / generate output
-.nuxt
-dist
-
-# Gatsby files
-.cache/
-public
-
-# Vuepress build output
-.vuepress/dist
-
-# Serverless directories
-.serverless/
-
-# FuseBox cache
-.fusebox/
-
-# DynamoDB Local files
-.dynamodb/
-
-# TernJS port file
-.tern-port
-
-# Stores VSCode versions used for testing VSCode extensions
-.vscode-test
-
-# Electron build outputs
-dist/
-build/
-out/
-release/
-
-# Electron specific
-*.log
-main.js.map
-renderer.js.map
+# Application settings and user data
+settings.json
+user-settings.json
+app-settings.json
+user-data/
+*.db
+*.sqlite
+*.sqlite3
 
 # Test files and sample data
 file-test/
 test-files/
 sample-books/
+test-data/
 *.epub
 *.pdf
+
+# Logs
+*.log
+logs/
+debug.log
+error.log
 
 # OS generated files
 .DS_Store
@@ -138,18 +110,13 @@ desktop.ini
 .settings/
 *.sublime-project
 *.sublime-workspace
+.vscode-test
 
 # Temporary files
 *.tmp
 *.temp
 .cache/
-
-# Application specific
-user-data/
-app-settings.json
-*.db
-*.sqlite
-*.sqlite3
+temp/
 
 # Archives
 *.zip
@@ -157,30 +124,54 @@ app-settings.json
 *.rar
 *.7z
 
-# Windows specific
+# Compiled Python executables
 *.exe
 *.msi
-
-# macOS specific
 *.app
 *.dmg
-
-# Linux specific
 *.AppImage
 *.deb
 *.rpm
 
-# Package managers
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
-
-# Security
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
 # API keys and secrets
-config/keys.js
-secrets.json
+api_keys.py
+secrets.py
+config/keys.py
+private/
+keys/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Python packaging
+*.whl
+pip-log.txt
+pip-delete-this-directory.txt
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# PyCharm
+.idea/
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# Sphinx documentation
+docs/_build/
