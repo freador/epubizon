@@ -1,0 +1,22 @@
+{
+    "terminal.integrated.defaultProfile.linux": "bash",
+    "terminal.integrated.profiles.linux": {
+        "bash": {
+            "path": "/bin/bash",
+            "args": ["-l"],
+            "env": {
+                "DISPLAY": ":99"
+            }
+        }
+    },
+    "files.associations": {
+        "*.sh": "shellscript"
+    },
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "eslint.workingDirectories": ["src"],
+    "emmet.includeLanguages": {
+        "javascript": "javascriptreact"
+    },
+    "git.ignoreLimitWarning": true
+}
