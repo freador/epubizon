@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Epubizon - EPUB & PDF Reader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1 class="app-title">📚 Epubizon</h1>
+                <button id="openFileBtn" class="btn btn-primary">Open File</button>
+            </div>
+            <div class="header-right">
+                <button id="settingsBtn" class="btn btn-secondary">⚙️ Settings</button>
+                <button id="summaryBtn" class="btn btn-accent" disabled>✨ Summarize Chapter</button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h3>Navigation</h3>
+                </div>
+                <div class="book-info">
+                    <div id="bookTitle" class="book-title">No book loaded</div>
+                    <div id="bookMeta" class="book-meta"></div>
+                </div>
+                <div class="chapters-list">
+                    <h4>Chapters</h4>
+                    <ul id="chaptersList" class="chapters-ul">
+                        <li class="no-chapters">Load a book to see chapters</li>
+                    </ul>
+                </div>
+                <div class="navigation-help">
+                    <h4>Keyboard Controls</h4>
+                    <div class="controls">
+                        <div class="control-item">← Previous Page</div>
+                        <div class="control-item">→ Next Page</div>
+                        <div class="control-item">↑ Next Chapter</div>
+                        <div class="control-item">↓ Previous Chapter</div>
+                        <div class="control-item">S Summarize Chapter</div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Document Viewer -->
+            <section class="document-viewer">
+                <div id="documentContainer" class="document-container">
+                    <div class="welcome-screen">
+                        <div class="welcome-content">
+                            <h2>Welcome to Epubizon</h2>
+                            <p>Your modern EPUB and PDF reader with AI-powered summaries</p>
+                            <button id="openFileWelcome" class="btn btn-primary btn-large">
+                                📂 Open Your First Book
+                            </button>
+                            <div class="supported-formats">
+                                <small>Supports EPUB and PDF files</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Navigation Bar -->
+                <div class="nav-bar">
+                    <button id="prevPageBtn" class="nav-btn" disabled>← Previous</button>
+                    <div class="page-info">
+                        <span id="currentPage">-</span> / <span id="totalPages">-</span>
+                    </div>
+                    <button id="nextPageBtn" class="nav-btn" disabled>Next →</button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Summary Panel -->
+        <div id="summaryPanel" class="summary-panel hidden">
+            <div class="summary-header">
+                <h3>Chapter Summary</h3>
+                <button id="closeSummaryBtn" class="close-btn">✕</button>
+            </div>
+            <div class="summary-content">
+                <div id="summaryLoading" class="loading hidden">
+                    <div class="spinner"></div>
+                    <p>Generating summary...</p>
+                </div>
+                <div id="summaryText" class="summary-text"></div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settingsModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Settings</h2>
+                    <button id="closeSettingsBtn" class="close-btn">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="setting-group">
+                        <label for="openaiKey">OpenAI API Key:</label>
+                        <input type="password" id="openaiKey" placeholder="Enter your OpenAI API key">
+                        <small class="help-text">
+                            Your API key is stored locally and used only for generating summaries.
+                            <a href="https://platform.openai.com/api-keys" target="_blank">Get your API key here</a>
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="saveSettingsBtn" class="btn btn-primary">Save Settings</button>
+                    <button id="cancelSettingsBtn" class="btn btn-secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay hidden">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p>Loading book...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="epub-handler.js"></script>
+    <script src="pdf-handler.js"></script>
+    <script src="keyboard-handler.js"></script>
+    <script src="renderer.js"></script>
+</body>
+</html>
