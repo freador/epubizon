@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 import PyPDF2
 import re
+import io
 
 class PdfHandler:
     def __init__(self):
@@ -40,6 +41,32 @@ class PdfHandler:
                 
         except Exception as e:
             raise Exception(f"Erro ao carregar PDF: {str(e)}")
+    
+    def load_book_from_data(self, file_data: bytes) -> Dict[str, Any]:
+        """Carrega um arquivo PDF a partir de dados binários"""
+        try:
+            pdf_io = io.BytesIO(file_data)
+            self.pdf_reader = PyPDF2.PdfReader(pdf_io)
+            
+            # Extrair metadata
+            self.metadata = self._extract_metadata()
+            
+            # Extrair páginas
+            self.pages = self._extract_pages()
+            
+            # Criar "capítulos" baseados em páginas
+            chapters = self._create_chapters()
+            
+            return {
+                'handler': 'pdf',
+                'metadata': self.metadata,
+                'chapters': chapters,
+                'total_pages': len(self.pages),
+                'pdf_pages': len(self.pdf_reader.pages)
+            }
+            
+        except Exception as e:
+            raise Exception(f"Erro ao carregar PDF dos dados: {str(e)}")
             
     def _extract_metadata(self) -> Dict[str, str]:
         """Extrai metadados do PDF"""

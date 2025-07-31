@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 """
-Epubizon - Leitor EPUB e PDF em Python
-Versão reescrita do aplicativo Electron original
+Epubizon - Versão Simples com Flet
+Interface moderna e estável
 """
 
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, scrolledtext
+import flet as ft
 import os
-import sys
-from pathlib import Path
 import threading
-import json
+from pathlib import Path
 from typing import Optional, Dict, List, Any
 
 # Importa os módulos principais
@@ -19,15 +16,11 @@ from pdf_handler import PdfHandler
 from settings_manager import SettingsManager
 from ai_summarizer import AISummarizer
 
+
 class EpubizonApp:
-    def __init__(self):
-        self.root = tk.Tk()
-        self.root.title("📚 Epubizon - Leitor EPUB & PDF")
-        self.root.geometry("1400x900")
-        self.root.minsize(1000, 700)
-        
-        # Configurar estilo moderno
-        self.setup_styles()
+    def __init__(self, page: ft.Page):
+        self.page = page
+        self.setup_page()
         
         # Gerenciadores
         self.settings = SettingsManager()
@@ -35,540 +28,596 @@ class EpubizonApp:
         self.pdf_handler = PdfHandler()
         self.ai_summarizer = AISummarizer()
         
-        # Estado da aplicação
+        # Estado
         self.current_book = None
         self.current_chapter = 0
         self.chapters = []
         self.book_metadata = {}
         
-        self.setup_ui()
-        self.setup_keyboard_shortcuts()
-        self.load_settings()
+        # UI Components
+        self.book_title = ft.Text("Nenhum livro carregado", size=16, weight=ft.FontWeight.BOLD)
+        self.content_column = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
+        self.chapters_list = ft.Column(scroll=ft.ScrollMode.AUTO, spacing=5)
+        self.status_bar = ft.Text("Pronto", size=12, color=ft.Colors.BLUE_GREY_600)
+        self.page_info = ft.Text("Página: - / -", size=12)
         
-    def setup_styles(self):
-        """Configura estilos modernos da aplicação"""
-        # Configurar cores e tema
-        self.root.configure(bg="#ecf0f1")
+        self.build_ui()
         
-        # Configurar estilos ttk
-        style = ttk.Style()
+    def setup_page(self):
+        """Configura a página"""
+        self.page.title = "📚 Epubizon - Leitor EPUB & PDF"
+        self.page.theme_mode = ft.ThemeMode.LIGHT
+        self.page.window_width = 1400
+        self.page.window_height = 900
+        self.page.padding = 20
         
-        # Estilo para buttons
-        style.configure("Modern.TButton",
-                       padding=(15, 8),
-                       font=("Segoe UI", 10),
-                       relief="flat")
+    def build_ui(self):
+        """Constrói a interface"""
+        # File picker
+        self.file_picker = ft.FilePicker(on_result=self.on_file_picked)
+        self.page.overlay.append(self.file_picker)
         
-        # Estilo para labels
-        style.configure("Modern.TLabel",
-                       font=("Segoe UI", 10),
-                       background="#ecf0f1")
-        
-        # Estilo para frames
-        style.configure("Modern.TFrame",
-                       background="#ecf0f1",
-                       relief="flat")
-        
-        # Estilo para labelframes
-        style.configure("Modern.TLabelframe",
-                       background="#ecf0f1",
-                       relief="solid",
-                       borderwidth=1)
-        
-        style.configure("Modern.TLabelframe.Label",
-                       background="#ecf0f1",
-                       font=("Segoe UI", 11, "bold"),
-                       foreground="#2c3e50")
-        
-    def setup_ui(self):
-        """Configura a interface do usuário"""
-        # Menu principal
-        self.create_menu()
-        
-        # Frame principal
-        main_frame = ttk.Frame(self.root)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        # Toolbar
-        self.create_toolbar(main_frame)
-        
-        # Frame de conteúdo (sidebar + viewer)
-        content_frame = ttk.Frame(main_frame)
-        content_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
+        # Header
+        header = ft.Row([
+            ft.ElevatedButton(
+                "📂 Abrir Arquivo",
+                icon=ft.Icons.FOLDER_OPEN,
+                on_click=lambda _: self.file_picker.pick_files(
+                    allowed_extensions=["epub", "pdf"],
+                    dialog_title="Selecionar arquivo EPUB ou PDF"
+                )
+            ),
+            ft.Container(width=20),
+            self.book_title,
+            ft.Container(expand=True),
+            ft.ElevatedButton(
+                "✨ Resumir",
+                icon=ft.Icons.AUTO_AWESOME,
+                on_click=self.summarize_chapter,
+                disabled=True,
+                ref=ft.Ref[ft.ElevatedButton]()
+            ),
+            ft.ElevatedButton(
+                "⚙️ Config",
+                icon=ft.Icons.SETTINGS,
+                on_click=self.show_settings
+            )
+        ])
         
         # Sidebar
-        self.create_sidebar(content_frame)
-        
-        # Viewer principal
-        self.create_viewer(content_frame)
-        
-        # Status bar
-        self.create_status_bar()
-        
-    def create_menu(self):
-        """Cria o menu principal"""
-        menubar = tk.Menu(self.root)
-        self.root.config(menu=menubar)
-        
-        # Menu Arquivo
-        file_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Arquivo", menu=file_menu)
-        file_menu.add_command(label="Abrir...", command=self.open_file, accelerator="Ctrl+O")
-        file_menu.add_separator()
-        file_menu.add_command(label="Sair", command=self.root.quit, accelerator="Ctrl+Q")
-        
-        # Menu Ferramentas
-        tools_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Ferramentas", menu=tools_menu)
-        tools_menu.add_command(label="Resumir Capítulo", command=self.summarize_chapter, accelerator="F1")
-        tools_menu.add_separator()
-        tools_menu.add_command(label="Configurações", command=self.open_settings, accelerator="Ctrl+,")
-        
-        # Menu Ajuda
-        help_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Ajuda", menu=help_menu)
-        help_menu.add_command(label="Sobre", command=self.show_about)
-        
-    def create_toolbar(self, parent):
-        """Cria a barra de ferramentas"""
-        toolbar = ttk.Frame(parent)
-        toolbar.pack(fill=tk.X, pady=(0, 10))
-        
-        # Botão abrir arquivo
-        self.open_btn = ttk.Button(toolbar, text="📂 Abrir Arquivo", command=self.open_file)
-        self.open_btn.pack(side=tk.LEFT, padx=(0, 15))
-        
-        # Informações do livro
-        self.book_info_label = ttk.Label(toolbar, text="Nenhum livro carregado", 
-                                        font=("Segoe UI", 12, "bold"),
-                                        foreground="#2c3e50")
-        self.book_info_label.pack(side=tk.LEFT, padx=15)
-        
-        # Botões do lado direito
-        right_frame = ttk.Frame(toolbar)
-        right_frame.pack(side=tk.RIGHT)
-        
-        self.summary_btn = ttk.Button(right_frame, text="✨ Resumir", command=self.summarize_chapter, state=tk.DISABLED)
-        self.summary_btn.pack(side=tk.RIGHT, padx=(15, 0))
-        
-        self.settings_btn = ttk.Button(right_frame, text="⚙️ Configurações", command=self.open_settings)
-        self.settings_btn.pack(side=tk.RIGHT, padx=(0, 10))
-        
-    def create_sidebar(self, parent):
-        """Cria a sidebar com navegação"""
-        sidebar_frame = ttk.LabelFrame(parent, text="📚 Navegação", width=320, style="Modern.TLabelframe")
-        sidebar_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 15))
-        sidebar_frame.pack_propagate(False)
-        
-        # Lista de capítulos
-        chapters_frame = ttk.LabelFrame(sidebar_frame, text="📖 Capítulos", style="Modern.TLabelframe")
-        chapters_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
-        
-        # Treeview para capítulos
-        self.chapters_tree = ttk.Treeview(chapters_frame, show="tree")
-        scrollbar_chapters = ttk.Scrollbar(chapters_frame, orient=tk.VERTICAL, command=self.chapters_tree.yview)
-        self.chapters_tree.configure(yscrollcommand=scrollbar_chapters.set)
-        
-        self.chapters_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar_chapters.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        self.chapters_tree.bind("<<TreeviewSelect>>", self.on_chapter_select)
-        
-        # Controles de navegação
-        nav_frame = ttk.Frame(sidebar_frame)
-        nav_frame.pack(fill=tk.X, padx=5, pady=5)
-        
-        self.prev_btn = ttk.Button(nav_frame, text="← Anterior", command=self.prev_chapter, state=tk.DISABLED)
-        self.prev_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 2))
-        
-        self.next_btn = ttk.Button(nav_frame, text="Próximo →", command=self.next_chapter, state=tk.DISABLED)
-        self.next_btn.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(2, 0))
-        
-        # Informações de página
-        self.page_info = ttk.Label(sidebar_frame, text="Página: - / -")
-        self.page_info.pack(pady=5)
-        
-        # Ajuda de teclado
-        help_frame = ttk.LabelFrame(sidebar_frame, text="⌨️ Atalhos", style="Modern.TLabelframe")
-        help_frame.pack(fill=tk.X, padx=8, pady=8)
-        
-        help_text = "← → Navegar capítulos\n↑ ↓ Navegar capítulos\nF1 Resumir capítulo\nCtrl+O Abrir arquivo\nCtrl+, Configurações"
-        help_label = ttk.Label(help_frame, text=help_text, font=("Arial", 8))
-        help_label.pack(padx=5, pady=5)
-        
-    def create_viewer(self, parent):
-        """Cria o visualizador principal"""
-        viewer_frame = ttk.LabelFrame(parent, text="📄 Conteúdo", style="Modern.TLabelframe")
-        viewer_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
-        
-        # Área de conteúdo com scroll
-        self.content_text = scrolledtext.ScrolledText(
-            viewer_frame, 
-            wrap=tk.WORD, 
-            font=("Georgia", 13),
-            padx=30,
-            pady=25,
-            state=tk.DISABLED,
-            bg="#fafafa",
-            fg="#2c3e50",
-            insertbackground="#3498db",
-            selectbackground="#3498db",
-            selectforeground="white",
-            relief=tk.FLAT,
-            borderwidth=0
+        sidebar = ft.Container(
+            content=ft.Column([
+                ft.Text("📚 Navegação", size=18, weight=ft.FontWeight.BOLD),
+                ft.Divider(height=2),
+                
+                ft.Text("📖 Capítulos", size=14, weight=ft.FontWeight.W_500),
+                ft.Container(
+                    content=self.chapters_list,
+                    height=400,
+                    width=300,
+                    border=ft.border.all(1, ft.Colors.OUTLINE),
+                    border_radius=8,
+                    padding=10
+                ),
+                
+                # Navigation buttons
+                ft.Row([
+                    ft.ElevatedButton(
+                        "← Anterior",
+                        on_click=self.prev_chapter,
+                        disabled=True,
+                        ref=ft.Ref[ft.ElevatedButton]()
+                    ),
+                    ft.ElevatedButton(
+                        "Próximo →",
+                        on_click=self.next_chapter,
+                        disabled=True,
+                        ref=ft.Ref[ft.ElevatedButton]()  
+                    )
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                
+                self.page_info,
+                
+                ft.Divider(),
+                ft.Text("⌨️ Atalhos", size=12, weight=ft.FontWeight.W_500),
+                ft.Text(
+                    "← → Navegar\nF1 Resumir\nCtrl+O Abrir",
+                    size=10,
+                    color=ft.Colors.BLUE_GREY_600
+                )
+            ], spacing=10),
+            padding=20
         )
-        self.content_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Configurar tags para formatação
-        self.content_text.tag_configure("title", 
-                                      font=("Georgia", 20, "bold"), 
-                                      spacing1=15, spacing3=15, 
-                                      foreground="#2c3e50",
-                                      justify=tk.CENTER)
-        self.content_text.tag_configure("subtitle", 
-                                      font=("Georgia", 16, "bold"), 
-                                      spacing1=10, spacing3=10,
-                                      foreground="#34495e")
-        self.content_text.tag_configure("paragraph", 
-                                      font=("Georgia", 13), 
-                                      spacing1=5, spacing3=8,
-                                      foreground="#2c3e50",
-                                      lmargin1=10, lmargin2=10)
-        self.content_text.tag_configure("highlight", 
-                                      background="#f1c40f", 
-                                      foreground="#2c3e50")
+        # Content area
+        content_area = ft.Container(
+            content=ft.Column([
+                ft.Text("📄 Conteúdo", size=18, weight=ft.FontWeight.BOLD),
+                ft.Divider(height=2),
+                ft.Container(
+                    content=self.content_column,
+                    expand=True,
+                    border=ft.border.all(1, ft.Colors.OUTLINE),
+                    border_radius=8,
+                    padding=20
+                )
+            ]),
+            expand=True,
+            padding=20
+        )
         
-        # Mensagem de boas-vindas
-        self.show_welcome_message()
+        # Main layout
+        main_row = ft.Row([
+            sidebar,
+            ft.VerticalDivider(width=1),
+            content_area
+        ], expand=True)
         
-    def create_status_bar(self):
-        """Cria a barra de status"""
-        self.status_bar = ttk.Label(self.root, text="Pronto", relief=tk.SUNKEN, anchor=tk.W)
-        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+        # Add to page
+        self.page.add(
+            ft.Column([
+                header,
+                ft.Divider(),
+                main_row,
+                ft.Divider(),
+                self.status_bar
+            ], expand=True, spacing=10)
+        )
         
-    def show_welcome_message(self):
+        self.show_welcome()
+        
+        # Store refs
+        self.summary_btn = header.controls[4]
+        self.prev_btn = sidebar.content.controls[4].controls[0]
+        self.next_btn = sidebar.content.controls[4].controls[1]
+        
+    def show_welcome(self):
         """Mostra mensagem de boas-vindas"""
-        welcome_text = """
-        
-        Bem-vindo ao Epubizon
-        
-        Seu leitor moderno de EPUB e PDF com resumos alimentados por IA
-        
-        ✨ Recursos Principais:
-        • Interface nativa e responsiva
-        • Navegação intuitiva por capítulos
-        • Resumos inteligentes com IA
-        • Suporte completo para EPUB e PDF
-        • Atalhos de teclado avançados
-        
-        🚀 Para começar:
-        1. Clique em "📂 Abrir Arquivo" ou pressione Ctrl+O
-        2. Selecione um arquivo EPUB ou PDF
-        3. Use as setas do teclado para navegar entre capítulos
-        4. Pressione F1 para gerar um resumo inteligente
-        
-        💡 Dica: Configure sua chave da API OpenAI nas configurações para usar os resumos!
-        
-        """
-        
-        self.content_text.config(state=tk.NORMAL)
-        self.content_text.delete(1.0, tk.END)
-        
-        # Inserir título
-        self.content_text.insert(tk.END, "📚 Epubizon v2.0\n", "title")
-        
-        # Inserir conteúdo
-        self.content_text.insert(tk.END, welcome_text, "paragraph")
-        self.content_text.config(state=tk.DISABLED)
-        
-    def setup_keyboard_shortcuts(self):
-        """Configura atalhos de teclado"""
-        self.root.bind("<Control-o>", lambda e: self.open_file())
-        self.root.bind("<Control-q>", lambda e: self.root.quit())
-        self.root.bind("<Control-comma>", lambda e: self.open_settings())
-        self.root.bind("<F1>", lambda e: self.summarize_chapter())
-        self.root.bind("<Left>", lambda e: self.prev_chapter())
-        self.root.bind("<Right>", lambda e: self.next_chapter())
-        self.root.bind("<Up>", lambda e: self.prev_chapter())
-        self.root.bind("<Down>", lambda e: self.next_chapter())
-        
-    def open_file(self):
-        """Abre diálogo para selecionar arquivo"""
-        file_path = filedialog.askopenfilename(
-            title="Selecionar arquivo",
-            filetypes=[
-                ("Todos os suportados", "*.epub;*.pdf"),
-                ("Arquivos EPUB", "*.epub"),
-                ("Arquivos PDF", "*.pdf"),
-                ("Todos os arquivos", "*.*")
-            ]
-        )
-        
-        if file_path:
-            self.load_book(file_path)
+        welcome = ft.Column([
+            ft.Text("🎉 Bem-vindo ao Epubizon v2.0", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE),
+            ft.Text("Interface moderna com Flet + Flutter", size=16, color=ft.Colors.BLUE_GREY),
+            ft.Divider(),
             
-    def load_book(self, file_path: str):
-        """Carrega um livro"""
-        self.update_status("Carregando livro...")
+            ft.Text("✨ Recursos:", size=18, weight=ft.FontWeight.BOLD),
+            ft.Text("• Interface moderna e responsiva"),
+            ft.Text("• Navegação rápida por capítulos"),
+            ft.Text("• Resumos inteligentes com IA"),
+            ft.Text("• Suporte para EPUB e PDF"),
+            
+            ft.Divider(),
+            ft.Text("🚀 Como usar:", size=18, weight=ft.FontWeight.BOLD),
+            ft.Text("1. Clique em '📂 Abrir Arquivo' para começar"),
+            ft.Text("2. Navegue pelos capítulos na barra lateral"),
+            ft.Text("3. Use '✨ Resumir' para gerar resumos com IA"),
+            
+            ft.Container(height=20),
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Text(
+                        "💡 Configure sua chave OpenAI nas configurações para usar resumos!",
+                        color=ft.Colors.WHITE
+                    ),
+                    padding=15
+                ),
+                color=ft.Colors.ORANGE
+            )
+        ], spacing=10)
         
-        # Executar em thread separada para não travar a UI
-        threading.Thread(target=self._load_book_thread, args=(file_path,), daemon=True).start()
+        self.content_column.controls = [welcome]
+        self.page.update()
         
-    def _load_book_thread(self, file_path: str):
-        """Thread para carregar livro"""
+    def on_file_picked(self, e: ft.FilePickerResultEvent):
+        """Callback quando arquivo é selecionado"""
+        print(f"File picker event: {e}")
+        if e.files:
+            file_info = e.files[0]
+            print(f"Selected file: {file_info.name}, size: {file_info.size}")
+            
+            # Try to use file path if available
+            if hasattr(file_info, 'path') and file_info.path:
+                # Desktop mode - use file path
+                print(f"Using file path: {file_info.path}")
+                threading.Thread(target=self.load_book_thread, args=(file_info.path,), daemon=True).start()
+            elif hasattr(file_info, 'read') or hasattr(e, 'read'):
+                # Web/mobile mode - handle file data
+                print("Web mode detected - reading file data")
+                threading.Thread(target=self.load_book_from_picker, args=(file_info,), daemon=True).start()
+            else:
+                # Fallback - try to construct path from name
+                print("Trying fallback path construction")
+                file_name = file_info.name
+                # Check if file exists in current directory
+                if os.path.exists(file_name):
+                    threading.Thread(target=self.load_book_thread, args=(file_name,), daemon=True).start()
+                else:
+                    self.show_error("Erro", f"Não foi possível acessar o arquivo '{file_name}'. Certifique-se de que o arquivo esteja acessível ou copie-o para a pasta do aplicativo.")
+        else:
+            print("No files selected")
+    
+    def load_book_from_picker(self, file_info):
+        """Carrega livro a partir do file picker (modo web)"""
         try:
-            file_ext = Path(file_path).suffix.lower()
+            print(f"Loading book from picker: {file_info.name}")
+            self.update_status("Lendo arquivo...")
+            
+            # Try to read file data
+            file_data = None
+            if hasattr(file_info, 'read'):
+                file_data = file_info.read()
+            elif hasattr(file_info, 'data'):
+                file_data = file_info.data
+            else:
+                raise ValueError("Não foi possível ler os dados do arquivo")
+                
+            file_ext = Path(file_info.name).suffix.lower()
+            print(f"File extension: {file_ext}")
             
             if file_ext == '.epub':
+                print("Loading EPUB from data...")
+                book_data = self.epub_handler.load_book_from_data(file_data)
+            elif file_ext == '.pdf':
+                print("Loading PDF from data...")
+                book_data = self.pdf_handler.load_book_from_data(file_data)
+            else:
+                raise ValueError(f"Formato não suportado: {file_ext}")
+            
+            print(f"Book loaded successfully: {book_data.get('metadata', {}).get('title', 'No title')}")
+                
+            # Update state
+            self.current_book = book_data
+            self.chapters = book_data.get('chapters', [])
+            self.book_metadata = book_data.get('metadata', {})
+            self.current_chapter = 0
+            
+            # Update UI in main thread
+            self.page.run_thread(self.on_book_loaded)
+            
+        except Exception as e:
+            error_msg = str(e)
+            print(f"Error loading book from picker: {error_msg}")
+            self.page.run_thread(lambda: self.show_error("Erro ao carregar livro", error_msg))
+    
+    def load_book_thread(self, file_path: str):
+        """Carrega livro em thread separada"""
+        try:
+            print(f"Loading book: {file_path}")
+            self.update_status("Carregando livro...")
+            
+            file_ext = Path(file_path).suffix.lower()
+            print(f"File extension: {file_ext}")
+            
+            if file_ext == '.epub':
+                print("Loading EPUB...")
                 book_data = self.epub_handler.load_book(file_path)
             elif file_ext == '.pdf':
+                print("Loading PDF...")
                 book_data = self.pdf_handler.load_book(file_path)
             else:
                 raise ValueError(f"Formato não suportado: {file_ext}")
+            
+            print(f"Book loaded successfully: {book_data.get('metadata', {}).get('title', 'No title')}")
                 
-            # Atualizar UI na thread principal
-            self.root.after(0, self._on_book_loaded, book_data, file_path)
+            # Update state
+            self.current_book = book_data
+            self.chapters = book_data.get('chapters', [])
+            self.book_metadata = book_data.get('metadata', {})
+            self.current_chapter = 0
+            
+            # Update UI in main thread
+            self.page.run_thread(self.on_book_loaded)
             
         except Exception as e:
-            self.root.after(0, self._on_book_load_error, str(e))
+            error_msg = str(e)
+            self.page.run_thread(lambda: self.show_error("Erro ao carregar livro", error_msg))
             
-    def _on_book_loaded(self, book_data: Dict[str, Any], file_path: str):
-        """Callback quando livro é carregado com sucesso"""
-        self.current_book = book_data
-        self.chapters = book_data.get('chapters', [])
-        self.book_metadata = book_data.get('metadata', {})
-        self.current_chapter = 0
+    def on_book_loaded(self):
+        """Callback quando livro é carregado"""
+        print("Book loaded callback started")
         
-        # Atualizar UI
-        self.update_book_info()
-        self.populate_chapters_tree()
-        self.load_chapter(0)
-        
-        # Habilitar controles
-        self.summary_btn.config(state=tk.NORMAL)
-        self.prev_btn.config(state=tk.NORMAL)
-        self.next_btn.config(state=tk.NORMAL)
-        
-        self.update_status(f"Livro carregado: {self.book_metadata.get('title', Path(file_path).name)}")
-        
-    def _on_book_load_error(self, error_msg: str):
-        """Callback quando ocorre erro ao carregar livro"""
-        messagebox.showerror("Erro", f"Erro ao carregar livro:\n{error_msg}")
-        self.update_status("Erro ao carregar livro")
-        
-    def update_book_info(self):
-        """Atualiza informações do livro na UI"""
+        # Update title
         title = self.book_metadata.get('title', 'Título desconhecido')
         author = self.book_metadata.get('creator', self.book_metadata.get('author', ''))
         
         if author:
-            info_text = f"{title} - {author}"
+            self.book_title.value = f"{title} - {author}"
         else:
-            info_text = title
+            self.book_title.value = title
             
-        self.book_info_label.config(text=info_text)
+        print(f"Book title set: {self.book_title.value}")
+        print(f"Total chapters: {len(self.chapters)}")
+            
+        # Update chapters list
+        self.update_chapters_list()
         
-    def populate_chapters_tree(self):
-        """Popula a árvore de capítulos"""
-        # Limpar árvore existente
-        for item in self.chapters_tree.get_children():
-            self.chapters_tree.delete(item)
-            
-        # Adicionar capítulos
+        # Load first chapter
+        if self.chapters:
+            print("Loading first chapter")
+            self.load_chapter(0)
+        else:
+            print("No chapters found")
+        
+        # Enable buttons
+        print("Enabling buttons")
+        try:
+            self.summary_btn.disabled = False
+            self.prev_btn.disabled = False
+            self.next_btn.disabled = False
+        except Exception as e:
+            print(f"Error enabling buttons: {e}")
+        
+        self.update_status(f"Livro carregado: {title}")
+        self.page.update()
+        print("Book loaded callback completed")
+        
+    def update_chapters_list(self):
+        """Atualiza lista de capítulos"""
+        self.chapters_list.controls.clear()
+        
         for i, chapter in enumerate(self.chapters):
             title = chapter.get('title', f'Capítulo {i+1}')
-            self.chapters_tree.insert('', 'end', iid=str(i), text=title)
             
-    def on_chapter_select(self, event):
-        """Callback quando capítulo é selecionado"""
-        selection = self.chapters_tree.selection()
-        if selection:
-            chapter_index = int(selection[0])
-            self.load_chapter(chapter_index)
+            # Create chapter button
+            btn = ft.TextButton(
+                content=ft.Row([
+                    ft.Icon(ft.Icons.ARTICLE_OUTLINED, size=16),
+                    ft.Column([
+                        ft.Text(title, size=12, weight=ft.FontWeight.W_500),
+                        ft.Text(f"Cap. {i+1}", size=10, color=ft.Colors.BLUE_GREY_600)
+                    ], spacing=2, expand=True)
+                ], spacing=10),
+                on_click=lambda e, idx=i: self.select_chapter(idx),
+                style=ft.ButtonStyle(
+                    bgcolor=ft.Colors.BLUE_50 if i == self.current_chapter else None,
+                    side=ft.BorderSide(1, ft.Colors.BLUE) if i == self.current_chapter else None
+                )
+            )
             
-    def load_chapter(self, chapter_index: int):
-        """Carrega um capítulo específico"""
-        if not self.chapters or chapter_index < 0 or chapter_index >= len(self.chapters):
-            return
+            self.chapters_list.controls.append(btn)
             
-        self.current_chapter = chapter_index
-        chapter = self.chapters[chapter_index]
+        self.page.update()
         
-        self.update_status(f"Carregando capítulo: {chapter.get('title', f'Capítulo {chapter_index+1}')}")
+    def select_chapter(self, chapter_index: int):
+        """Seleciona um capítulo"""
+        threading.Thread(target=self.load_chapter_thread, args=(chapter_index,), daemon=True).start()
         
-        # Executar em thread separada
-        threading.Thread(target=self._load_chapter_thread, args=(chapter_index,), daemon=True).start()
-        
-    def _load_chapter_thread(self, chapter_index: int):
-        """Thread para carregar capítulo"""
+    def load_chapter_thread(self, chapter_index: int):
+        """Carrega capítulo em thread"""
         try:
-            if self.current_book.get('handler') == 'epub':
+            print(f"Loading chapter {chapter_index}")
+            if not self.chapters or chapter_index < 0 or chapter_index >= len(self.chapters):
+                print(f"Invalid chapter index: {chapter_index}, total chapters: {len(self.chapters) if self.chapters else 0}")
+                return
+                
+            self.current_chapter = chapter_index
+            chapter = self.chapters[chapter_index]
+            
+            chapter_title = chapter.get('title', f'Capítulo {chapter_index+1}')
+            print(f"Loading chapter: {chapter_title}")
+            self.update_status(f"Carregando: {chapter_title}")
+            
+            content = ""
+            handler_type = self.current_book.get('handler') if self.current_book else None
+            print(f"Handler type: {handler_type}")
+            
+            if handler_type == 'epub':
+                print("Using EPUB handler")
                 content = self.epub_handler.get_chapter_content(chapter_index)
-            elif self.current_book.get('handler') == 'pdf':
+            elif handler_type == 'pdf':
+                print("Using PDF handler")
+                # Store chapters in PDF handler for content retrieval
+                if not hasattr(self.pdf_handler, '_chapters'):
+                    self.pdf_handler._chapters = self.chapters
                 content = self.pdf_handler.get_chapter_content(chapter_index)
             else:
-                # Fallback para dados já carregados
-                chapter = self.chapters[chapter_index]
-                content = chapter.get('content', f"Conteúdo do {chapter.get('title', f'Capítulo {chapter_index+1}')}")
+                print(f"Unknown or missing handler: {handler_type}")
+                content = f"Conteúdo do {chapter_title}\n\nEste é um conteúdo de exemplo. O handler '{handler_type}' não foi reconhecido ou o livro não foi carregado corretamente."
                 
-            self.root.after(0, self._on_chapter_loaded, content, chapter_index)
+            print(f"Content loaded, length: {len(content)} characters")
+                
+            # Update UI in main thread
+            self.page.run_thread(lambda: self.on_chapter_loaded(content, chapter_index))
             
         except Exception as e:
-            self.root.after(0, self._on_chapter_load_error, str(e))
+            error_msg = str(e)
+            print(f"Error loading chapter {chapter_index}: {error_msg}")
+            self.page.run_thread(lambda: self.show_error("Erro ao carregar capítulo", error_msg))
             
-    def _on_chapter_loaded(self, content: str, chapter_index: int):
+    def on_chapter_loaded(self, content: str, chapter_index: int):
         """Callback quando capítulo é carregado"""
-        # Atualizar conteúdo
-        self.content_text.config(state=tk.NORMAL)
-        self.content_text.delete(1.0, tk.END)
+        chapter = self.chapters[chapter_index]
+        title = chapter.get('title', f'Capítulo {chapter_index+1}')
         
-        # Inserir título
-        chapter_title = self.chapters[chapter_index].get('title', f'Capítulo {chapter_index+1}')
-        self.content_text.insert(tk.END, f"{chapter_title}\n\n", "title")
+        # Update content
+        self.content_column.controls = [
+            ft.Text(title, size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE),
+            ft.Divider(),
+            ft.Text(content, size=14, selectable=True)
+        ]
         
-        # Inserir conteúdo
-        self.content_text.insert(tk.END, content, "paragraph")
-        self.content_text.config(state=tk.DISABLED)
+        # Update chapters list selection
+        self.update_chapters_list()
         
-        # Atualizar seleção na árvore
-        self.chapters_tree.selection_set(str(chapter_index))
-        self.chapters_tree.see(str(chapter_index))
+        # Update page info
+        self.page_info.value = f"Página: {chapter_index + 1} / {len(self.chapters)}"
         
-        # Atualizar informações de página
-        self.update_page_info()
+        self.update_status(f"Capítulo carregado: {title}")
+        self.page.update()
         
-        self.update_status(f"Capítulo carregado: {chapter_title}")
+    def load_chapter(self, chapter_index: int):
+        """Carrega capítulo (versão síncrona)"""
+        threading.Thread(target=self.load_chapter_thread, args=(chapter_index,), daemon=True).start()
         
-    def _on_chapter_load_error(self, error_msg: str):
-        """Callback quando ocorre erro ao carregar capítulo"""
-        messagebox.showerror("Erro", f"Erro ao carregar capítulo:\n{error_msg}")
-        self.update_status("Erro ao carregar capítulo")
-        
-    def update_page_info(self):
-        """Atualiza informações de página"""
-        if self.chapters:
-            page_text = f"Página: {self.current_chapter + 1} / {len(self.chapters)}"
-            self.page_info.config(text=page_text)
-        else:
-            self.page_info.config(text="Página: - / -")
-            
-    def prev_chapter(self):
-        """Navega para o capítulo anterior"""
+    def prev_chapter(self, e):
+        """Capítulo anterior"""
         if self.current_chapter > 0:
             self.load_chapter(self.current_chapter - 1)
             
-    def next_chapter(self):
-        """Navega para o próximo capítulo"""
+    def next_chapter(self, e):
+        """Próximo capítulo"""
         if self.current_chapter < len(self.chapters) - 1:
             self.load_chapter(self.current_chapter + 1)
             
-    def summarize_chapter(self):
-        """Gera resumo do capítulo atual usando IA"""
-        if not self.chapters or not self.current_book:
-            messagebox.showwarning("Aviso", "Nenhum capítulo carregado para resumir")
+    def summarize_chapter(self, e):
+        """Gera resumo do capítulo"""
+        if not self.chapters:
+            self.show_error("Aviso", "Nenhum capítulo carregado")
             return
             
         api_key = self.settings.get('openai_api_key')
         if not api_key:
-            messagebox.showwarning("Aviso", "Configure sua chave da API OpenAI nas configurações")
-            self.open_settings()
+            self.show_error("Aviso", "Configure sua chave OpenAI nas configurações")
             return
             
-        # Executar em thread separada
-        threading.Thread(target=self._summarize_chapter_thread, daemon=True).start()
+        threading.Thread(target=self.summarize_thread, daemon=True).start()
         
-    def _summarize_chapter_thread(self):
+    def summarize_thread(self):
         """Thread para gerar resumo"""
         try:
-            # Obter texto do capítulo atual
-            chapter_content = self.content_text.get(1.0, tk.END).strip()
-            
-            if not chapter_content:
-                self.root.after(0, lambda: messagebox.showwarning("Aviso", "Nenhum conteúdo para resumir"))
+            # Get chapter content (simple text extraction)
+            if len(self.content_column.controls) >= 3:
+                content = self.content_column.controls[2].value
+            else:
+                content = "Sem conteúdo"
+                
+            if not content or content == "Sem conteúdo":
+                self.page.run_thread(lambda: self.show_error("Aviso", "Nenhum conteúdo para resumir"))
                 return
                 
-            api_key = self.settings.get('openai_api_key')
-            summary = self.ai_summarizer.generate_summary(chapter_content, api_key)
+            self.update_status("Gerando resumo...")
             
-            self.root.after(0, self._on_summary_generated, summary)
+            api_key = self.settings.get('openai_api_key')
+            summary = self.ai_summarizer.generate_summary(content, api_key)
+            
+            self.page.run_thread(lambda: self.show_summary(summary))
             
         except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Erro", f"Erro ao gerar resumo:\n{str(e)}"))
+            self.page.run_thread(lambda: self.show_error("Erro", f"Erro ao gerar resumo: {str(e)}"))
             
-    def _on_summary_generated(self, summary: str):
-        """Callback quando resumo é gerado"""
-        self.show_summary_dialog(summary)
+    def show_summary(self, summary: str):
+        """Mostra resumo em diálogo"""
+        def close_dialog(e):
+            self.page.dialog.open = False
+            self.page.update()
+            
+        dialog = ft.AlertDialog(
+            title=ft.Text("✨ Resumo Gerado por IA"),
+            content=ft.Container(
+                content=ft.Text(summary, selectable=True),
+                width=500,
+                height=300
+            ),
+            actions=[
+                ft.TextButton("Fechar", on_click=close_dialog)
+            ]
+        )
         
-    def show_summary_dialog(self, summary: str):
-        """Mostra diálogo com o resumo"""
-        dialog = tk.Toplevel(self.root)
-        dialog.title("Resumo do Capítulo")
-        dialog.geometry("600x400")
-        dialog.resizable(True, True)
+        self.page.dialog = dialog
+        dialog.open = True
+        self.update_status("Resumo gerado")
+        self.page.update()
         
-        # Frame principal
-        main_frame = ttk.Frame(dialog)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+    def show_settings(self, e):
+        """Mostra configurações"""
+        def close_dialog(e):
+            self.page.dialog.open = False
+            self.page.update()
+            
+        def save_settings(e):
+            # Save API key
+            api_key = api_key_field.value.strip()
+            if api_key:
+                self.settings.set('openai_api_key', api_key)
+                self.settings.save()
+                
+            close_dialog(e)
+            self.show_info("Sucesso", "Configurações salvas!")
+            
+        # API key field
+        api_key_field = ft.TextField(
+            label="Chave da API OpenAI",
+            value=self.settings.get('openai_api_key', ''),
+            password=True,
+            helper_text="Obtenha em: https://platform.openai.com/api-keys"
+        )
         
-        # Título
-        title_label = ttk.Label(main_frame, text="✨ Resumo Gerado por IA", font=("Arial", 14, "bold"))
-        title_label.pack(pady=(0, 10))
+        dialog = ft.AlertDialog(
+            title=ft.Text("⚙️ Configurações"),
+            content=ft.Container(
+                content=ft.Column([
+                    ft.Text("API OpenAI", size=16, weight=ft.FontWeight.BOLD),
+                    api_key_field,
+                    ft.Text(
+                        "A chave é armazenada localmente e usada apenas para gerar resumos.",
+                        size=12,
+                        color=ft.Colors.BLUE_GREY_600
+                    )
+                ], spacing=10),
+                width=400
+            ),
+            actions=[
+                ft.TextButton("Cancelar", on_click=close_dialog),
+                ft.ElevatedButton("Salvar", on_click=save_settings)
+            ]
+        )
         
-        # Texto do resumo
-        summary_text = scrolledtext.ScrolledText(main_frame, wrap=tk.WORD, font=("Georgia", 11))
-        summary_text.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
-        summary_text.insert(tk.END, summary)
-        summary_text.config(state=tk.DISABLED)
+        self.page.dialog = dialog
+        dialog.open = True
+        self.page.update()
         
-        # Botão fechar
-        close_btn = ttk.Button(main_frame, text="Fechar", command=dialog.destroy)
-        close_btn.pack(pady=5)
+    def show_error(self, title: str, message: str):
+        """Mostra erro"""
+        def close_dialog(e):
+            self.page.dialog.open = False
+            self.page.update()
+            
+        dialog = ft.AlertDialog(
+            title=ft.Text(f"❌ {title}"),
+            content=ft.Text(message),
+            actions=[ft.TextButton("OK", on_click=close_dialog)]
+        )
         
-        # Centralizar diálogo
-        dialog.transient(self.root)
-        dialog.grab_set()
+        self.page.dialog = dialog
+        dialog.open = True
+        self.page.update()
         
-    def open_settings(self):
-        """Abre diálogo de configurações"""
-        from settings_dialog import SettingsDialog
-        dialog = SettingsDialog(self.root, self.settings)
-        self.root.wait_window(dialog.dialog)
+    def show_info(self, title: str, message: str):
+        """Mostra informação"""
+        def close_dialog(e):
+            self.page.dialog.open = False
+            self.page.update()
+            
+        dialog = ft.AlertDialog(
+            title=ft.Text(f"ℹ️ {title}"),
+            content=ft.Text(message),
+            actions=[ft.TextButton("OK", on_click=close_dialog)]
+        )
         
-    def load_settings(self):
-        """Carrega configurações salvas"""
-        self.settings.load()
-        
-    def show_about(self):
-        """Mostra diálogo sobre o aplicativo"""
-        about_text = """
-        Epubizon v2.0
-        
-        Leitor moderno de EPUB e PDF em Python
-        
-        Recursos:
-        • Suporte para EPUB e PDF
-        • Interface nativa
-        • Resumos com IA (OpenAI)
-        • Navegação por teclado
-        • Multiplataforma
-        
-        Reescrito do Electron para Python
-        """
-        
-        messagebox.showinfo("Sobre o Epubizon", about_text)
+        self.page.dialog = dialog
+        dialog.open = True
+        self.page.update()
         
     def update_status(self, message: str):
-        """Atualiza barra de status"""
-        self.status_bar.config(text=message)
-        
-    def run(self):
-        """Executa o aplicativo"""
-        self.root.mainloop()
+        """Atualiza status"""
+        self.status_bar.value = message
+        if hasattr(self, 'page'):
+            self.page.update()
 
-def main():
-    """Função principal"""
-    app = EpubizonApp()
-    app.run()
+
+def main(page: ft.Page):
+    EpubizonApp(page)
+
 
 if __name__ == "__main__":
-    main()
+    # Try different modes based on environment
+    import os
+    if os.environ.get('WSL_DISTRO_NAME'):
+        # Running in WSL - try desktop mode first, fallback to web
+        try:
+            ft.app(target=main, view=ft.FLET_APP)
+        except:
+            print("Desktop mode failed, trying web mode...")
+            print("Open http://localhost:8550 in your Windows browser")
+            ft.app(target=main, view=ft.WEB_BROWSER, port=8550)
+    else:
+        # Not in WSL - use desktop mode
+        ft.app(target=main, view=ft.FLET_APP)

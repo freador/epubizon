@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+      "Bash(sudo apt:*)",
+      "Bash(sudo apt install:*)",
+      "Bash(apt list:*)",
+      "Bash(dpkg:*)",
+      "Bash(chmod:*)",
+      "Bash(npm install)",
+      "Bash(./install-linux-deps.sh:*)",
+      "Bash(find:*)",
+      "Bash(ldd:*)",
+      "Bash(apt search:*)",
+      "Bash(./install-correct-libs.sh:*)",
+      "Bash(ldconfig:*)",
+      "Bash(npm run web:*)",
+      "Bash(npm run dev:*)",
+      "Bash(rm:*)",
+      "Bash(npm run clean:*)",
+      "Bash(ls:*)",
+      "Bash(python3:*)",
+      "Bash(source:*)",
+      "Bash(pip install:*)",
+      "Bash(echo $DISPLAY)",
+      "Bash(export DISPLAY=:0)",
+      "Bash(grep:*)",
+      "Bash(python:*)",
+      "Bash(mv:*)",
+      "Bash(timeout:*)"
+    ],
+    "deny": []
+  }
+}

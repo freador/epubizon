@@ -44,6 +44,33 @@ class EpubHandler:
             
         except Exception as e:
             raise Exception(f"Erro ao carregar EPUB: {str(e)}")
+    
+    def load_book_from_data(self, file_data: bytes) -> Dict[str, Any]:
+        """Carrega um arquivo EPUB a partir de dados binários"""
+        try:
+            # Create a temporary file-like object from the data
+            book_io = io.BytesIO(file_data)
+            self.book = epub.read_epub(book_io)
+            
+            # Extrair metadata
+            self.metadata = self._extract_metadata()
+            
+            # Extrair capítulos
+            self.chapters = self._extract_chapters()
+            
+            # Extrair imagens
+            self.images = self._extract_images()
+            
+            return {
+                'handler': 'epub',
+                'metadata': self.metadata,
+                'chapters': self.chapters,
+                'total_pages': len(self.chapters),
+                'images': list(self.images.keys())
+            }
+            
+        except Exception as e:
+            raise Exception(f"Erro ao carregar EPUB dos dados: {str(e)}")
             
     def _extract_metadata(self) -> Dict[str, str]:
         """Extrai metadados do EPUB"""
@@ -67,29 +94,54 @@ class EpubHandler:
         try:
             # Usar tabela de conteúdos se disponível
             if hasattr(self.book, 'toc') and self.book.toc:
-                for i, (section, children) in enumerate(self.book.toc):
-                    if hasattr(section, 'title') and hasattr(section, 'href'):
+                for i, item in enumerate(self.book.toc):
+                    # Se item é uma tupla (section, children)
+                    if isinstance(item, tuple) and len(item) >= 2:
+                        section, children = item
+                        if hasattr(section, 'title') and hasattr(section, 'href'):
+                            chapters.append({
+                                'title': section.title or f'Capítulo {i+1}',
+                                'href': section.href,
+                                'id': f'chapter-{i}',
+                                'index': i
+                            })
+                        # Processar children se existirem
+                        if children:
+                            for j, child in enumerate(children):
+                                if hasattr(child, 'title') and hasattr(child, 'href'):
+                                    chapters.append({
+                                        'title': child.title or f'Seção {i+1}.{j+1}',
+                                        'href': child.href,
+                                        'id': f'chapter-{i}-{j}',
+                                        'index': len(chapters)
+                                    })
+                    # Se item é um Link direto
+                    elif hasattr(item, 'title') and hasattr(item, 'href'):
                         chapters.append({
-                            'title': section.title or f'Capítulo {i+1}',
-                            'href': section.href,
+                            'title': item.title or f'Capítulo {i+1}',
+                            'href': item.href,
                             'id': f'chapter-{i}',
                             'index': i
                         })
-                    elif isinstance(section, tuple) and len(section) >= 2:
-                        # Formato alternativo
-                        chapters.append({
-                            'title': section[0] or f'Capítulo {i+1}',
-                            'href': section[1].href if hasattr(section[1], 'href') else '',
-                            'id': f'chapter-{i}',
-                            'index': i
-                        })
+                    # Se item é uma lista de Links
+                    elif isinstance(item, list):
+                        for j, link in enumerate(item):
+                            if hasattr(link, 'title') and hasattr(link, 'href'):
+                                chapters.append({
+                                    'title': link.title or f'Capítulo {i+1}.{j+1}',
+                                    'href': link.href,
+                                    'id': f'chapter-{i}-{j}',
+                                    'index': len(chapters)
+                                })
             
-            # Fallback: usar spine se ToC não estiver disponível
+            # Fallback: usar spine se ToC não estiver disponível ou vazio
             if not chapters:
                 spine_items = [item for item in self.book.get_items() if item.get_type() == ebooklib.ITEM_DOCUMENT]
+                
                 for i, item in enumerate(spine_items):
+                    title = self._extract_title_from_content(item) or f'Capítulo {i+1}'
                     chapters.append({
-                        'title': self._extract_title_from_content(item) or f'Capítulo {i+1}',
+                        'title': title,
                         'href': item.get_name(),
                         'id': item.get_id() or f'chapter-{i}',
                         'index': i,

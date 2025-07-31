@@ -1,16 +1,17 @@
 # 📚 Epubizon - EPUB & PDF Reader
 
-Uma aplicação desktop moderna em Python para leitura de arquivos EPUB e PDF com resumos alimentados por IA.
+Uma aplicação desktop moderna com **Flet + Flutter** para leitura de arquivos EPUB e PDF com resumos alimentados por IA.
 
 ## ✨ Recursos
 
 - 📚 **Suporte EPUB & PDF** - Leia arquivos EPUB e PDF
 - 🤖 **Resumos com IA** - Gere resumos de capítulos usando OpenAI API
 - ⌨️ **Navegação por Teclado** - Navegue com setas e atalhos
-- 🎨 **Interface Moderna** - Design limpo e responsivo
-- 📖 **Navegação por Capítulos** - Salte diretamente para qualquer capítulo
+- 🎨 **Interface Flutter** - Design moderno e responsivo com Material Design
+- ⚡ **Performance Nativa** - Construído com Flet (Flutter para Python)
+- 📖 **Navegação Intuitiva** - Salte diretamente para qualquer capítulo
+- 🔧 **Multi-plataforma** - Desktop, Web e Mobile
 - 🖼️ **Processamento de Imagens** - Suporte completo para imagens em EPUBs
-- ⚙️ **Configurações Avançadas** - Personalize fontes, temas e mais
 
 ## 🚀 Instalação
 
@@ -90,12 +91,12 @@ epubizon/
 
 ## 🔧 Dependências
 
+- **flet** - Framework Flutter para Python (interface moderna)
 - **ebooklib** - Processamento de arquivos EPUB
 - **PyPDF2** - Processamento de arquivos PDF  
 - **Pillow** - Processamento de imagens
 - **openai** - Integração com OpenAI API
 - **beautifulsoup4** - Parsing de HTML/XML
-- **tkinter** - Interface gráfica (incluída no Python)
 
 ## 🤝 Contribuindo
 
@@ -111,10 +112,11 @@ MIT - veja o arquivo LICENSE para detalhes.
 
 ## 🆕 Changelog
 
-### v2.0.0
-- ✅ Reescrito completamente em Python (era Electron)
-- ✅ Interface nativa com tkinter
-- ✅ Melhor performance e menor uso de memória
-- ✅ Suporte completo para navegação por capítulos
-- ✅ Design moderno e responsivo
-- ✅ Configurações avançadas
+### v2.0.0 🚀
+- ✅ **Interface Flutter nativa** - Migrado do Tkinter para Flet
+- ✅ **Design Material moderno** - Interface bonita e responsiva
+- ✅ **Performance excelente** - Construído com Flutter/Dart
+- ✅ **Multi-plataforma** - Desktop, Web e Mobile
+- ✅ **Navegação melhorada** - Todos os capítulos EPUB funcionando
+- ✅ **Configurações integradas** - Diálogos nativos
+- ✅ **Threading otimizado** - Interface não trava durante carregamento
