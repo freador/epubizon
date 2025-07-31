@@ -57,6 +57,22 @@ class EpubizonApp:
             self.status_bar = ft.Text("Pronto", size=12, color=ft.Colors.BLUE_GREY_600)
             self.page_info = ft.Text("Página: - / -", size=12)
             
+            # Loading indicator - centered vertically and horizontally
+            self.loading_overlay = ft.Container(
+                content=ft.Column([
+                    ft.ProgressRing(color=ft.Colors.BLUE, stroke_width=4),
+                    ft.Text("Carregando...", size=16, color=ft.Colors.BLUE, weight=ft.FontWeight.BOLD),
+                    ft.Text("", size=12, color=ft.Colors.BLUE_GREY_600, ref=ft.Ref[ft.Text]())
+                ], 
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER, 
+                spacing=10),
+                bgcolor=ft.Colors.with_opacity(0.9, ft.Colors.WHITE),
+                alignment=ft.alignment.center,
+                visible=False,
+                expand=True
+            )
+            self.loading_message = self.loading_overlay.content.controls[2]
+            
             print("Construindo UI...")
             self.build_ui()
             # Diretório temporário para imagens
@@ -80,6 +96,12 @@ class EpubizonApp:
         self.page.window_height = 900
         self.page.padding = 20
         
+        # Set application icon
+        try:
+            self.page.window_icon = "assets/faicon.png"
+        except Exception as e:
+            print(f"Warning: Could not set window icon: {e}")
+        
         # Set up keyboard shortcuts
         self.page.on_keyboard_event = self.on_keyboard_event
         
@@ -94,6 +116,17 @@ class EpubizonApp:
         
         # Header
         header = ft.Row([
+            # Logo
+            ft.Container(
+                content=ft.Image(
+                    src="assets/logo.png",
+                    width=40,
+                    height=40,
+                    fit=ft.ImageFit.CONTAIN,
+                    error_content=ft.Icon(ft.Icons.BOOK, size=40, color=ft.Colors.BLUE)
+                ),
+                margin=ft.margin.only(right=10)
+            ),
             ft.ElevatedButton(
                 "Abrir Arquivo",
                 icon=ft.Icons.FOLDER_OPEN,
@@ -164,10 +197,27 @@ class EpubizonApp:
             padding=20
         )
         
+        # Scroll indicator
+        self.scroll_indicator = ft.Container(
+            content=ft.Row([
+                ft.Icon(ft.Icons.KEYBOARD_ARROW_DOWN, size=16, color=ft.Colors.BLUE_GREY_400),
+                ft.Text("Role para ver mais conteúdo", size=11, color=ft.Colors.BLUE_GREY_600),
+                ft.Icon(ft.Icons.KEYBOARD_ARROW_DOWN, size=16, color=ft.Colors.BLUE_GREY_400)
+            ], alignment=ft.MainAxisAlignment.CENTER),
+            bgcolor=ft.Colors.BLUE_GREY_50,
+            border_radius=4,
+            padding=ft.padding.symmetric(horizontal=10, vertical=5),
+            visible=False
+        )
+        
         # Content area
         content_area = ft.Container(
             content=ft.Column([
-                ft.Text("📄 Conteúdo", size=18, weight=ft.FontWeight.BOLD),
+                ft.Row([
+                    ft.Text("📄 Conteúdo", size=18, weight=ft.FontWeight.BOLD),
+                    ft.Container(expand=True),
+                    self.scroll_indicator
+                ]),
                 ft.Divider(height=2),
                 ft.Container(
                     content=self.content_column,
@@ -188,29 +238,47 @@ class EpubizonApp:
             content_area
         ], expand=True)
         
-        # Add to page
+        # Main content
+        main_content = ft.Column([
+            header,
+            ft.Divider(),
+            main_row,
+            ft.Divider(),
+            self.status_bar
+        ], expand=True, spacing=10)
+        
+        # Add to page with loading overlay
         self.page.add(
-            ft.Column([
-                header,
-                ft.Divider(),
-                main_row,
-                ft.Divider(),
-                self.status_bar
-            ], expand=True, spacing=10)
+            ft.Stack([
+                main_content,
+                self.loading_overlay
+            ], expand=True)
         )
         
         self.show_welcome()
         
         # Store refs
-        self.summary_btn = header.controls[4]
+        self.summary_btn = header.controls[5]  # Updated index due to logo container
         self.prev_btn = sidebar.content.controls[4].controls[0]
         self.next_btn = sidebar.content.controls[4].controls[1]
         
     def show_welcome(self):
         """Mostra mensagem de boas-vindas"""
         welcome = ft.Column([
-            ft.Text("Bem-vindo ao Epubizon v2.0", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE),
-            ft.Text("Interface moderna com Flet + Flutter", size=16, color=ft.Colors.BLUE_GREY),
+            # Logo and title
+            ft.Row([
+                ft.Image(
+                    src="assets/logo.png",
+                    width=60,
+                    height=60,
+                    fit=ft.ImageFit.CONTAIN,
+                    error_content=ft.Icon(ft.Icons.BOOK, size=60, color=ft.Colors.BLUE)
+                ),
+                ft.Column([
+                    ft.Text("Bem-vindo ao Epubizon v2.0", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE),
+                    ft.Text("Interface moderna com Flet + Flutter", size=16, color=ft.Colors.BLUE_GREY),
+                ], spacing=5)
+            ], alignment=ft.MainAxisAlignment.CENTER, spacing=20),
             ft.Divider(),
             
             ft.Text("Recursos:", size=18, weight=ft.FontWeight.BOLD),
@@ -316,16 +384,18 @@ class EpubizonApp:
         """Carrega livro em thread separada"""
         try:
             print(f"Loading book: {file_path}")
-            self.update_status("Carregando livro...")
+            self.page.run_thread(lambda: self.show_loading("Carregando livro..."))
             
             file_ext = Path(file_path).suffix.lower()
             print(f"File extension: {file_ext}")
             
             if file_ext == '.epub':
                 print("Loading EPUB...")
+                self.page.run_thread(lambda: self.show_loading("Processando arquivo EPUB..."))
                 book_data = self.epub_handler.load_book(file_path)
             elif file_ext == '.pdf':
                 print("Loading PDF...")
+                self.page.run_thread(lambda: self.show_loading("Processando arquivo PDF..."))
                 book_data = self.pdf_handler.load_book(file_path)
             else:
                 raise ValueError(f"Formato não suportado: {file_ext}")
@@ -343,6 +413,7 @@ class EpubizonApp:
             
         except Exception as e:
             error_msg = str(e)
+            self.page.run_thread(lambda: self.hide_loading())
             self.page.run_thread(lambda: self.show_error("Erro ao carregar livro", error_msg))
             
     def on_book_loaded(self):
@@ -380,6 +451,7 @@ class EpubizonApp:
         except Exception as e:
             print(f"Error enabling buttons: {e}")
         
+        self.hide_loading()
         self.update_status(f"Livro carregado: {title}")
         self.page.update()
         print("Book loaded callback completed")
@@ -541,6 +613,12 @@ class EpubizonApp:
         # Update content
         self.content_column.controls = content_controls
         
+        # Check if content needs scrolling and show indicator
+        try:
+            self.check_scroll_needed()
+        except Exception as e:
+            print(f"Error checking scroll indicator: {e}")
+        
         # Auto-scroll to top if enabled
         if self.settings.get('auto_scroll_on_page_change', True):
             self.content_column.scroll_to(offset=0, duration=300)
@@ -584,47 +662,125 @@ class EpubizonApp:
     def summarize_thread(self):
         """Thread para gerar resumo"""
         try:
-            # Get chapter content (simple text extraction)
-            if len(self.content_column.controls) >= 3:
-                content = self.content_column.controls[2].value
+            # Show loading
+            chapter_title = self.chapters[self.current_chapter].get('title', f'Capítulo {self.current_chapter+1}') if self.chapters else "Capítulo"
+            self.page.run_thread(lambda: self.show_loading(f"Analisando {chapter_title}..."))
+            
+            # Get chapter content properly
+            content = ""
+            handler_type = self.current_book.get('handler') if self.current_book else None
+            
+            if handler_type == 'epub':
+                content = self.epub_handler.get_chapter_text_for_summary(self.current_chapter)
+            elif handler_type == 'pdf':
+                if not hasattr(self.pdf_handler, '_chapters'):
+                    self.pdf_handler._chapters = self.chapters
+                content = self.pdf_handler.get_chapter_text_for_summary(self.current_chapter)
             else:
-                content = "Sem conteúdo"
+                # Fallback: extract text from UI controls
+                text_parts = []
+                for control in self.content_column.controls[2:]:  # Skip title and divider
+                    if hasattr(control, 'value') and control.value:
+                        text_parts.append(control.value)
+                content = '\n'.join(text_parts)
                 
-            if not content or content == "Sem conteúdo":
-                self.page.run_thread(lambda: self.show_error("Aviso", "Nenhum conteúdo para resumir"))
+            if not content or len(content.strip()) < 10:
+                self.page.run_thread(lambda: self.hide_loading())
+                self.page.run_thread(lambda: self.show_error("Aviso", "Nenhum conteúdo suficiente para resumir"))
                 return
-                
-            self.update_status("Gerando resumo...")
+            
+            # Update loading message
+            self.page.run_thread(lambda: self.show_loading("Gerando resumo com IA..."))
             
             api_key = self.settings.get('openai_api_key')
             summary = self.ai_summarizer.generate_summary(content, api_key)
             
-            self.page.run_thread(lambda: self.show_summary(summary))
+            self.page.run_thread(lambda: self.hide_loading())
+            self.page.run_thread(lambda: self.show_summary(summary, chapter_title))
             
         except Exception as e:
+            self.page.run_thread(lambda: self.hide_loading())
             self.page.run_thread(lambda: self.show_error("Erro", f"Erro ao gerar resumo: {str(e)}"))
             
-    def show_summary(self, summary: str):
-        """Mostra resumo em diálogo"""
+    def show_summary(self, summary: str, chapter_title: str = "Capítulo"):
+        """Mostra resumo em diálogo melhorado"""
         def close_dialog(e):
             self.page.dialog.open = False
             self.page.update()
             
+        def copy_summary(e):
+            try:
+                self.page.set_clipboard(summary)
+                copy_btn.text = "✓ Copiado!"
+                copy_btn.color = ft.Colors.GREEN
+                self.page.update()
+                # Reset button after 2 seconds
+                import time
+                threading.Timer(2.0, lambda: self.reset_copy_button(copy_btn)).start()
+            except Exception as ex:
+                print(f"Error copying to clipboard: {ex}")
+        
+        def reset_copy_button(btn):
+            try:
+                btn.text = "📋 Copiar"
+                btn.color = ft.Colors.BLUE
+                if hasattr(self, 'page'):
+                    self.page.update()
+            except:
+                pass
+        
+        # Create copy button reference
+        copy_btn = ft.TextButton(
+            "📋 Copiar",
+            on_click=copy_summary,
+            style=ft.ButtonStyle(color=ft.Colors.BLUE)
+        )
+        
         dialog = ft.AlertDialog(
-            title=ft.Text("Resumo Gerado por IA"),
+            title=ft.Row([
+                ft.Icon(ft.Icons.AUTO_AWESOME, color=ft.Colors.PURPLE),
+                ft.Text(f"Resumo: {chapter_title}", size=18, weight=ft.FontWeight.BOLD)
+            ]),
             content=ft.Container(
-                content=ft.Text(summary, selectable=True),
-                width=500,
-                height=300
+                content=ft.Column([
+                    ft.Container(
+                        content=ft.Text(
+                            summary, 
+                            selectable=True,
+                            size=14,
+                            color=ft.Colors.BLACK87
+                        ),
+                        bgcolor=ft.Colors.GREY_50,
+                        border_radius=8,
+                        padding=15,
+                        border=ft.border.all(1, ft.Colors.GREY_300)
+                    ),
+                    ft.Container(height=10),
+                    ft.Row([
+                        ft.Icon(ft.Icons.INFO_OUTLINE, size=16, color=ft.Colors.BLUE_GREY),
+                        ft.Text(
+                            f"Resumo gerado por IA • {len(summary.split())} palavras",
+                            size=12,
+                            color=ft.Colors.BLUE_GREY_600
+                        )
+                    ])
+                ], scroll=ft.ScrollMode.AUTO),
+                width=600,
+                height=400
             ),
             actions=[
-                ft.TextButton("Fechar", on_click=close_dialog)
+                copy_btn,
+                ft.TextButton(
+                    "Fechar", 
+                    on_click=close_dialog,
+                    style=ft.ButtonStyle(color=ft.Colors.GREY)
+                )
             ]
         )
         
         self.page.dialog = dialog
         dialog.open = True
-        self.update_status("Resumo gerado")
+        self.update_status("Resumo gerado com sucesso")
         self.page.update()
         
     def debug_show_settings(self, e):
@@ -911,6 +1067,27 @@ class EpubizonApp:
         self.status_bar.value = message
         if hasattr(self, 'page'):
             self.page.update()
+    
+    def show_loading(self, message: str = "Carregando..."):
+        """Show loading overlay"""
+        try:
+            if hasattr(self, 'loading_overlay') and hasattr(self, 'loading_message'):
+                self.loading_overlay.visible = True
+                self.loading_message.value = message
+                if hasattr(self, 'page'):
+                    self.page.update()
+        except Exception as e:
+            print(f"Error showing loading: {e}")
+    
+    def hide_loading(self):
+        """Hide loading overlay"""
+        try:
+            if hasattr(self, 'loading_overlay'):
+                self.loading_overlay.visible = False
+                if hasattr(self, 'page'):
+                    self.page.update()
+        except Exception as e:
+            print(f"Error hiding loading: {e}")
             
     def save_temp_image(self, data_uri: str) -> Optional[str]:
         """Salva imagem temporariamente e retorna o caminho"""
@@ -985,6 +1162,35 @@ class EpubizonApp:
         if e.data == "close":
             print("Aplicação sendo fechada, limpando recursos...")
             self.cleanup_temp_images()
+    
+    def check_scroll_needed(self):
+        """Check if content needs scrolling and show/hide indicator"""
+        try:
+            if not hasattr(self, 'scroll_indicator'):
+                return
+                
+            # Estimate if content height exceeds container height based on content length
+            total_text_length = 0
+            for control in self.content_column.controls[2:]:  # Skip title and divider
+                if hasattr(control, 'value') and control.value:
+                    total_text_length += len(str(control.value))
+            
+            # Rough estimate: if content is longer than ~3000 characters, it likely needs scroll
+            if total_text_length > 3000 or len(self.content_column.controls) > 8:
+                self.scroll_indicator.visible = True
+            else:
+                self.scroll_indicator.visible = False
+        except Exception as e:
+            print(f"Error checking scroll: {e}")
+    
+    def hide_scroll_indicator(self):
+        """Hide scroll indicator"""
+        try:
+            if hasattr(self, 'scroll_indicator'):
+                self.scroll_indicator.visible = False
+                # Don't call page.update() here to avoid threading issues
+        except Exception as e:
+            print(f"Error hiding scroll indicator: {e}")
 
 
 def main(page: ft.Page):

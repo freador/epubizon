@@ -28,7 +28,9 @@
       "Bash(grep:*)",
       "Bash(python:*)",
       "Bash(mv:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(del test_pdf_debug.py test_simple_pdf.py)",
+      "Bash(del:*)"
     ],
     "deny": []
   }
