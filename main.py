@@ -6,6 +6,7 @@ Interface moderna e estável
 
 import flet as ft
 import os
+import sys
 import threading
 import tempfile
 import base64
@@ -18,6 +19,7 @@ from epub_handler import EpubHandler
 from pdf_handler import PdfHandler
 from settings_manager import SettingsManager
 from ai_summarizer import AISummarizer
+from config_page import ConfigPage
 
 
 class EpubizonApp:
@@ -42,6 +44,10 @@ class EpubizonApp:
             self.current_chapter = 0
             self.chapters = []
             self.book_metadata = {}
+            
+            # Page navigation
+            self.current_page = "main"  # "main" or "config"
+            self.config_page = ConfigPage(self.page, self)
             
             print("Criando componentes UI...")
             # UI Components
@@ -109,7 +115,7 @@ class EpubizonApp:
             ft.ElevatedButton(
                 "Config",
                 icon=ft.Icons.SETTINGS,
-                on_click=lambda e: self.show_settings(e)
+                on_click=lambda e: self.debug_show_settings(e)
             )
         ])
         
@@ -621,6 +627,61 @@ class EpubizonApp:
         self.update_status("Resumo gerado")
         self.page.update()
         
+    def debug_show_settings(self, e):
+        """Navigate to config page"""
+        print("=== CONFIG BUTTON CLICKED ===")
+        print("Navigating to config page...")
+        
+        try:
+            self.update_status("Abrindo configurações...")
+            self.show_config_page()
+            
+        except Exception as ex:
+            print(f"ERROR in debug_show_settings: {ex}")
+            import traceback
+            traceback.print_exc()
+            
+            # Try to show a basic error
+            try:
+                self.update_status(f"Erro: {str(ex)}")
+            except:
+                print("Could not update status")
+    
+    def show_config_page(self):
+        """Show the configuration page"""
+        print("Showing config page...")
+        self.current_page = "config"
+        
+        # Clear the page
+        self.page.controls.clear()
+        
+        # Add config page content
+        config_content = self.config_page.build_config_page()
+        self.page.add(config_content)
+        self.page.update()
+        
+        print("Config page displayed")
+    
+    def show_main_page(self):
+        """Show the main application page"""
+        print("Showing main page...")
+        self.current_page = "main"
+        
+        # Clear the page
+        self.page.controls.clear()
+        
+        # Rebuild main UI
+        self.build_ui()
+        
+        # If there was a book loaded, restore it
+        if self.current_book and self.chapters:
+            print("Restoring book state...")
+            self.on_book_loaded()
+            if self.current_chapter < len(self.chapters):
+                self.load_chapter(self.current_chapter)
+        
+        print("Main page displayed")
+    
     def show_settings(self, e):
         """Mostra configurações"""
         try:
@@ -947,6 +1008,10 @@ def main(page: ft.Page):
 
 if __name__ == "__main__":
     print("=== INICIANDO EPUBIZON ===")
+    print(f"Python version: {sys.version}")
+    print(f"Platform: {sys.platform}")
+    print(f"Current directory: {os.getcwd()}")
+    
     try:
         # Try different modes based on environment
         import os
@@ -962,6 +1027,7 @@ if __name__ == "__main__":
         else:
             # Not in WSL - use desktop mode
             print("Tentando modo desktop...")
+            print("If config button doesn't work, check console for debug messages")
             ft.app(target=main, view=ft.FLET_APP)
             
     except Exception as e:
