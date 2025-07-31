@@ -98,9 +98,23 @@ class EpubizonApp:
         
         # Set application icon
         try:
+            # Try multiple methods to set the window icon
             self.page.window_icon = "assets/faicon.png"
+            
+            # Alternative: Set both window properties
+            if hasattr(self.page, 'window'):
+                self.page.window.icon = "assets/faicon.png"
+                
         except Exception as e:
             print(f"Warning: Could not set window icon: {e}")
+            # Try absolute path as fallback
+            try:
+                import os
+                icon_path = os.path.abspath("assets/faicon.png")
+                self.page.window_icon = icon_path
+                print(f"Using absolute path: {icon_path}")
+            except Exception as e2:
+                print(f"Absolute path also failed: {e2}")
         
         # Set up keyboard shortcuts
         self.page.on_keyboard_event = self.on_keyboard_event
@@ -119,7 +133,7 @@ class EpubizonApp:
             # Logo
             ft.Container(
                 content=ft.Image(
-                    src="assets/logo.png",
+                    src="assets/faicon.png",
                     width=40,
                     height=40,
                     fit=ft.ImageFit.CONTAIN,
@@ -268,7 +282,7 @@ class EpubizonApp:
             # Logo and title
             ft.Row([
                 ft.Image(
-                    src="assets/logo.png",
+                    src="assets/faicon.png",
                     width=60,
                     height=60,
                     fit=ft.ImageFit.CONTAIN,
@@ -1225,16 +1239,16 @@ if __name__ == "__main__":
             # Running in WSL - try desktop mode first, fallback to web
             try:
                 print("Tentando modo desktop (WSL)...")
-                ft.app(target=main, view=ft.FLET_APP)
+                ft.app(target=main, view=ft.FLET_APP, assets_dir="assets")
             except Exception as e:
                 print(f"Desktop mode failed: {e}, trying web mode...")
                 print("Open http://localhost:8550 in your Windows browser")
-                ft.app(target=main, view=ft.WEB_BROWSER, port=8550)
+                ft.app(target=main, view=ft.WEB_BROWSER, port=8550, assets_dir="assets")
         else:
             # Not in WSL - use desktop mode
             print("Tentando modo desktop...")
             print("If config button doesn't work, check console for debug messages")
-            ft.app(target=main, view=ft.FLET_APP)
+            ft.app(target=main, view=ft.FLET_APP, assets_dir="assets")
             
     except Exception as e:
         print(f"ERRO FATAL: {e}")
