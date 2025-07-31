@@ -27,7 +27,8 @@ class SettingsManager:
             'pages_per_chapter': 10,
             'summary_language': 'pt',
             'window_geometry': '1200x800',
-            'recent_files': []
+            'recent_files': [],
+            'auto_scroll_on_page_change': True
         }
         
     def load(self):

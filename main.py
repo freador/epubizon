@@ -7,6 +7,9 @@ Interface moderna e estável
 import flet as ft
 import os
 import threading
+import tempfile
+import base64
+import uuid
 from pathlib import Path
 from typing import Optional, Dict, List, Any
 
@@ -19,29 +22,49 @@ from ai_summarizer import AISummarizer
 
 class EpubizonApp:
     def __init__(self, page: ft.Page):
-        self.page = page
-        self.setup_page()
-        
-        # Gerenciadores
-        self.settings = SettingsManager()
-        self.epub_handler = EpubHandler()
-        self.pdf_handler = PdfHandler()
-        self.ai_summarizer = AISummarizer()
-        
-        # Estado
-        self.current_book = None
-        self.current_chapter = 0
-        self.chapters = []
-        self.book_metadata = {}
-        
-        # UI Components
-        self.book_title = ft.Text("Nenhum livro carregado", size=16, weight=ft.FontWeight.BOLD)
-        self.content_column = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
-        self.chapters_list = ft.Column(scroll=ft.ScrollMode.AUTO, spacing=5)
-        self.status_bar = ft.Text("Pronto", size=12, color=ft.Colors.BLUE_GREY_600)
-        self.page_info = ft.Text("Página: - / -", size=12)
-        
-        self.build_ui()
+        try:
+            print("Inicializando EpubizonApp...")
+            self.page = page
+            print("Configurando página...")
+            self.setup_page()
+            
+            print("Inicializando gerenciadores...")
+            # Gerenciadores
+            self.settings = SettingsManager()
+            self.settings.load()  # Load settings from file
+            self.epub_handler = EpubHandler()
+            self.pdf_handler = PdfHandler()
+            self.ai_summarizer = AISummarizer()
+            
+            print("Inicializando estado...")
+            # Estado
+            self.current_book = None
+            self.current_chapter = 0
+            self.chapters = []
+            self.book_metadata = {}
+            
+            print("Criando componentes UI...")
+            # UI Components
+            self.book_title = ft.Text("Nenhum livro carregado", size=16, weight=ft.FontWeight.BOLD)
+            self.content_column = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
+            self.chapters_list = ft.Column(scroll=ft.ScrollMode.AUTO, spacing=5)
+            self.status_bar = ft.Text("Pronto", size=12, color=ft.Colors.BLUE_GREY_600)
+            self.page_info = ft.Text("Página: - / -", size=12)
+            
+            print("Construindo UI...")
+            self.build_ui()
+            # Diretório temporário para imagens
+            self.temp_images = {}
+            self.temp_dir = tempfile.mkdtemp(prefix="epubizon_images_")
+            print(f"Diretório temporário criado: {self.temp_dir}")
+            
+            print("EpubizonApp inicializado com sucesso!")
+            
+        except Exception as e:
+            print(f"ERRO na inicialização do EpubizonApp: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
         
     def setup_page(self):
         """Configura a página"""
@@ -50,6 +73,12 @@ class EpubizonApp:
         self.page.window_width = 1400
         self.page.window_height = 900
         self.page.padding = 20
+        
+        # Set up keyboard shortcuts
+        self.page.on_keyboard_event = self.on_keyboard_event
+        
+        # Set up cleanup on close
+        self.page.on_window_event = self.on_window_event
         
     def build_ui(self):
         """Constrói a interface"""
@@ -60,7 +89,7 @@ class EpubizonApp:
         # Header
         header = ft.Row([
             ft.ElevatedButton(
-                "📂 Abrir Arquivo",
+                "Abrir Arquivo",
                 icon=ft.Icons.FOLDER_OPEN,
                 on_click=lambda _: self.file_picker.pick_files(
                     allowed_extensions=["epub", "pdf"],
@@ -71,26 +100,26 @@ class EpubizonApp:
             self.book_title,
             ft.Container(expand=True),
             ft.ElevatedButton(
-                "✨ Resumir",
+                "Resumir",
                 icon=ft.Icons.AUTO_AWESOME,
                 on_click=self.summarize_chapter,
                 disabled=True,
                 ref=ft.Ref[ft.ElevatedButton]()
             ),
             ft.ElevatedButton(
-                "⚙️ Config",
+                "Config",
                 icon=ft.Icons.SETTINGS,
-                on_click=self.show_settings
+                on_click=lambda e: self.show_settings(e)
             )
         ])
         
         # Sidebar
         sidebar = ft.Container(
             content=ft.Column([
-                ft.Text("📚 Navegação", size=18, weight=ft.FontWeight.BOLD),
+                ft.Text("Navegação", size=18, weight=ft.FontWeight.BOLD),
                 ft.Divider(height=2),
                 
-                ft.Text("📖 Capítulos", size=14, weight=ft.FontWeight.W_500),
+                ft.Text("Capítulos", size=14, weight=ft.FontWeight.W_500),
                 ft.Container(
                     content=self.chapters_list,
                     height=400,
@@ -121,7 +150,7 @@ class EpubizonApp:
                 ft.Divider(),
                 ft.Text("⌨️ Atalhos", size=12, weight=ft.FontWeight.W_500),
                 ft.Text(
-                    "← → Navegar\nF1 Resumir\nCtrl+O Abrir",
+                    "← → ↑ ↓ Navegar\nF1 Resumir\nCtrl+O Abrir",
                     size=10,
                     color=ft.Colors.BLUE_GREY_600
                 )
@@ -174,27 +203,27 @@ class EpubizonApp:
     def show_welcome(self):
         """Mostra mensagem de boas-vindas"""
         welcome = ft.Column([
-            ft.Text("🎉 Bem-vindo ao Epubizon v2.0", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE),
+            ft.Text("Bem-vindo ao Epubizon v2.0", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE),
             ft.Text("Interface moderna com Flet + Flutter", size=16, color=ft.Colors.BLUE_GREY),
             ft.Divider(),
             
-            ft.Text("✨ Recursos:", size=18, weight=ft.FontWeight.BOLD),
+            ft.Text("Recursos:", size=18, weight=ft.FontWeight.BOLD),
             ft.Text("• Interface moderna e responsiva"),
             ft.Text("• Navegação rápida por capítulos"),
             ft.Text("• Resumos inteligentes com IA"),
             ft.Text("• Suporte para EPUB e PDF"),
             
             ft.Divider(),
-            ft.Text("🚀 Como usar:", size=18, weight=ft.FontWeight.BOLD),
-            ft.Text("1. Clique em '📂 Abrir Arquivo' para começar"),
+            ft.Text("Como usar:", size=18, weight=ft.FontWeight.BOLD),
+            ft.Text("1. Clique em 'Abrir Arquivo' para começar"),
             ft.Text("2. Navegue pelos capítulos na barra lateral"),
-            ft.Text("3. Use '✨ Resumir' para gerar resumos com IA"),
+            ft.Text("3. Use 'Resumir' para gerar resumos com IA"),
             
             ft.Container(height=20),
             ft.Card(
                 content=ft.Container(
                     content=ft.Text(
-                        "💡 Configure sua chave OpenAI nas configurações para usar resumos!",
+                        "Configure sua chave OpenAI nas configurações para usar resumos!",
                         color=ft.Colors.WHITE
                     ),
                     padding=15
@@ -427,12 +456,88 @@ class EpubizonApp:
         chapter = self.chapters[chapter_index]
         title = chapter.get('title', f'Capítulo {chapter_index+1}')
         
-        # Update content
-        self.content_column.controls = [
+        # Limpar imagens temporárias anteriores
+        if hasattr(self, 'temp_images'):
+            for temp_path in self.temp_images.values():
+                try:
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                except:
+                    pass
+            self.temp_images.clear()
+        
+        # Process content to extract images and text
+        content_controls = [
             ft.Text(title, size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE),
-            ft.Divider(),
-            ft.Text(content, size=14, selectable=True)
+            ft.Divider()
         ]
+        
+        # Split content by image markers
+        import re
+        parts = re.split(r'\[IMAGE_DATA:(data:image/[^;]+;base64,[^\]]+)\]', content)
+        
+        for i, part in enumerate(parts):
+            if i % 2 == 0:  # Text part
+                if part.strip():
+                    font_size = self.settings.get('font_size', 14)
+                    content_controls.append(ft.Text(part.strip(), size=font_size, selectable=True))
+            else:  # Image part (data URI)
+                try:
+                    print(f"Processando imagem: {part[:50]}...")
+                    
+                    # Salvar imagem temporariamente
+                    temp_path = self.save_temp_image(part)
+                    
+                    if temp_path and os.path.exists(temp_path):
+                        # Usar arquivo temporário
+                        content_controls.append(
+                            ft.Container(
+                                content=ft.Image(
+                                    src=temp_path,
+                                    width=400,
+                                    height=300,
+                                    fit=ft.ImageFit.CONTAIN,
+                                    error_content=ft.Text("❌ Erro ao carregar imagem")
+                                ),
+                                alignment=ft.alignment.center,
+                                margin=ft.margin.symmetric(vertical=10)
+                            )
+                        )
+                        print(f"Imagem carregada do arquivo: {temp_path}")
+                    else:
+                        # Fallback: tentar data URI direto
+                        content_controls.append(
+                            ft.Container(
+                                content=ft.Image(
+                                    src=part,
+                                    width=400,
+                                    height=300,
+                                    fit=ft.ImageFit.CONTAIN,
+                                    error_content=ft.Text("❌ Erro ao carregar imagem")
+                                ),
+                                alignment=ft.alignment.center,
+                                margin=ft.margin.symmetric(vertical=10)
+                            )
+                        )
+                        print("Usando data URI direto")
+                        
+                except Exception as e:
+                    print(f"Erro ao carregar imagem: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    content_controls.append(
+                        ft.Container(
+                            content=ft.Text(f"❌ Erro ao carregar imagem: {str(e)[:100]}", color=ft.Colors.RED),
+                            margin=ft.margin.symmetric(vertical=10)
+                        )
+                    )
+        
+        # Update content
+        self.content_column.controls = content_controls
+        
+        # Auto-scroll to top if enabled
+        if self.settings.get('auto_scroll_on_page_change', True):
+            self.content_column.scroll_to(offset=0, duration=300)
         
         # Update chapters list selection
         self.update_chapters_list()
@@ -449,12 +554,12 @@ class EpubizonApp:
         
     def prev_chapter(self, e):
         """Capítulo anterior"""
-        if self.current_chapter > 0:
+        if self.chapters and self.current_chapter > 0:
             self.load_chapter(self.current_chapter - 1)
             
     def next_chapter(self, e):
         """Próximo capítulo"""
-        if self.current_chapter < len(self.chapters) - 1:
+        if self.chapters and self.current_chapter < len(self.chapters) - 1:
             self.load_chapter(self.current_chapter + 1)
             
     def summarize_chapter(self, e):
@@ -500,7 +605,7 @@ class EpubizonApp:
             self.page.update()
             
         dialog = ft.AlertDialog(
-            title=ft.Text("✨ Resumo Gerado por IA"),
+            title=ft.Text("Resumo Gerado por IA"),
             content=ft.Container(
                 content=ft.Text(summary, selectable=True),
                 width=500,
@@ -518,51 +623,195 @@ class EpubizonApp:
         
     def show_settings(self, e):
         """Mostra configurações"""
-        def close_dialog(e):
-            self.page.dialog.open = False
-            self.page.update()
+        try:
+            print("show_settings called!")
             
-        def save_settings(e):
-            # Save API key
-            api_key = api_key_field.value.strip()
-            if api_key:
-                self.settings.set('openai_api_key', api_key)
-                self.settings.save()
+            def close_dialog(e):
+                self.page.dialog.open = False
+                self.page.update()
                 
-            close_dialog(e)
-            self.show_info("Sucesso", "Configurações salvas!")
+            def validate_api_key(api_key):
+                """Validate OpenAI API key format"""
+                if not api_key:
+                    return True, ""  # Empty is allowed
+                if not api_key.startswith('sk-'):
+                    return False, "Chave da API deve começar com 'sk-'"
+                if len(api_key) < 40:
+                    return False, "Chave da API parece muito curta"
+                return True, ""
             
-        # API key field
-        api_key_field = ft.TextField(
-            label="Chave da API OpenAI",
-            value=self.settings.get('openai_api_key', ''),
-            password=True,
-            helper_text="Obtenha em: https://platform.openai.com/api-keys"
-        )
-        
-        dialog = ft.AlertDialog(
-            title=ft.Text("⚙️ Configurações"),
-            content=ft.Container(
-                content=ft.Column([
-                    ft.Text("API OpenAI", size=16, weight=ft.FontWeight.BOLD),
-                    api_key_field,
-                    ft.Text(
-                        "A chave é armazenada localmente e usada apenas para gerar resumos.",
-                        size=12,
-                        color=ft.Colors.BLUE_GREY_600
-                    )
-                ], spacing=10),
-                width=400
-            ),
-            actions=[
-                ft.TextButton("Cancelar", on_click=close_dialog),
-                ft.ElevatedButton("Salvar", on_click=save_settings)
-            ]
-        )
-        
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
+            def on_api_key_change(e):
+                """Validate API key as user types"""
+                api_key = api_key_field.value.strip()
+                is_valid, error_msg = validate_api_key(api_key)
+                
+                if not is_valid:
+                    api_key_field.error_text = error_msg
+                    save_button.disabled = True
+                else:
+                    api_key_field.error_text = None
+                    save_button.disabled = False
+                
+                self.page.update()
+            
+            def save_settings(e):
+                print("save_settings called!")
+                
+                # Validate API key before saving
+                api_key = api_key_field.value.strip()
+                is_valid, error_msg = validate_api_key(api_key)
+                
+                if not is_valid:
+                    api_key_field.error_text = error_msg
+                    self.page.update()
+                    return
+                
+                # Save API key (allow empty for removal)
+                self.settings.set('openai_api_key', api_key)
+                print(f"API key saved: {'***' if api_key else 'removed'}")
+                    
+                # Save auto-scroll setting
+                auto_scroll_value = auto_scroll_checkbox.value
+                self.settings.set('auto_scroll_on_page_change', auto_scroll_value)
+                print(f"Auto-scroll setting saved: {auto_scroll_value}")
+                
+                # Save font size setting
+                font_size_value = int(font_size_dropdown.value)
+                self.settings.set('font_size', font_size_value)
+                print(f"Font size saved: {font_size_value}")
+                
+                self.settings.save()
+                    
+                close_dialog(e)
+                self.show_info("Sucesso", "Configurações salvas com sucesso!")
+                
+            # API key field with validation
+            api_key_field = ft.TextField(
+                label="Chave da API OpenAI",
+                value=self.settings.get('openai_api_key', ''),
+                password=True,
+                hint_text="sk-...",
+                helper_text="Obtenha gratuitamente em: https://platform.openai.com/api-keys",
+                on_change=on_api_key_change,
+                border_radius=8,
+                filled=True
+            )
+            
+            # Auto-scroll checkbox
+            auto_scroll_checkbox = ft.Checkbox(
+                label="Rolar automaticamente para o topo ao trocar páginas",
+                value=self.settings.get('auto_scroll_on_page_change', True),
+                check_color=ft.Colors.WHITE,
+                active_color=ft.Colors.BLUE
+            )
+            
+            # Font size dropdown
+            font_size_dropdown = ft.Dropdown(
+                label="Tamanho da fonte",
+                value=str(self.settings.get('font_size', 14)),
+                options=[
+                    ft.dropdown.Option("10", "Muito pequeno (10px)"),
+                    ft.dropdown.Option("12", "Pequeno (12px)"),
+                    ft.dropdown.Option("14", "Normal (14px)"),
+                    ft.dropdown.Option("16", "Grande (16px)"),
+                    ft.dropdown.Option("18", "Muito grande (18px)"),
+                    ft.dropdown.Option("20", "Extra grande (20px)")
+                ],
+                border_radius=8,
+                filled=True
+            )
+            
+            # Create save button reference for validation
+            save_button = ft.ElevatedButton(
+                "Salvar",
+                on_click=save_settings,
+                style=ft.ButtonStyle(
+                    bgcolor=ft.Colors.BLUE,
+                    color=ft.Colors.WHITE
+                )
+            )
+            
+            dialog = ft.AlertDialog(
+                title=ft.Row([
+                    ft.Icon(ft.Icons.SETTINGS, color=ft.Colors.BLUE),
+                    ft.Text("Configurações do Epubizon", size=18, weight=ft.FontWeight.BOLD)
+                ]),
+                content=ft.Container(
+                    content=ft.Column([
+                        # OpenAI API Section
+                        ft.Container(
+                            content=ft.Column([
+                                ft.Row([
+                                    ft.Icon(ft.Icons.SMART_TOY, color=ft.Colors.GREEN),
+                                    ft.Text("Inteligência Artificial", size=16, weight=ft.FontWeight.BOLD)
+                                ]),
+                                api_key_field,
+                                ft.Container(
+                                    content=ft.Text(
+                                        "• Necessário para gerar resumos inteligentes\n• Sua chave é armazenada localmente com segurança\n• Nunca compartilhamos seus dados",
+                                        size=11,
+                                        color=ft.Colors.BLUE_GREY_600
+                                    ),
+                                    padding=ft.padding.only(left=10, top=5)
+                                )
+                            ], spacing=8),
+                            padding=10,
+                            border=ft.border.all(1, ft.Colors.BLUE_GREY_300),
+                            border_radius=8,
+                            bgcolor=ft.Colors.BLUE_GREY_50
+                        ),
+                        
+                        # Interface Section
+                        ft.Container(
+                            content=ft.Column([
+                                ft.Row([
+                                    ft.Icon(ft.Icons.TUNE, color=ft.Colors.ORANGE),
+                                    ft.Text("Interface", size=16, weight=ft.FontWeight.BOLD)
+                                ]),
+                                auto_scroll_checkbox,
+                                ft.Container(height=10),
+                                font_size_dropdown,
+                                ft.Container(
+                                    content=ft.Text(
+                                        "• Auto-scroll melhora a experiência de leitura\n• Tamanho da fonte afeta a legibilidade do texto",
+                                        size=11,
+                                        color=ft.Colors.BLUE_GREY_600
+                                    ),
+                                    padding=ft.padding.only(left=10, top=5)
+                                )
+                            ], spacing=8),
+                            padding=10,
+                            border=ft.border.all(1, ft.Colors.ORANGE_300),
+                            border_radius=8,
+                            bgcolor=ft.Colors.ORANGE_50
+                        )
+                    ], spacing=15),
+                    width=500,
+                    height=400
+                ),
+                actions=[
+                    ft.TextButton(
+                        "Cancelar",
+                        on_click=close_dialog,
+                        style=ft.ButtonStyle(color=ft.Colors.GREY)
+                    ),
+                    save_button
+                ]
+            )
+            
+            self.page.dialog = dialog
+            dialog.open = True
+            self.page.update()
+            print("Dialog should be visible now")
+            
+        except Exception as e:
+            print(f"Error in show_settings: {e}")
+            import traceback
+            traceback.print_exc()
+            try:
+                self.show_error("Erro", f"Erro ao abrir configurações: {str(e)}")
+            except:
+                print("Failed to show error dialog")
         
     def show_error(self, title: str, message: str):
         """Mostra erro"""
@@ -571,7 +820,7 @@ class EpubizonApp:
             self.page.update()
             
         dialog = ft.AlertDialog(
-            title=ft.Text(f"❌ {title}"),
+            title=ft.Text(f"Erro - {title}"),
             content=ft.Text(message),
             actions=[ft.TextButton("OK", on_click=close_dialog)]
         )
@@ -587,7 +836,7 @@ class EpubizonApp:
             self.page.update()
             
         dialog = ft.AlertDialog(
-            title=ft.Text(f"ℹ️ {title}"),
+            title=ft.Text(f"Info - {title}"),
             content=ft.Text(message),
             actions=[ft.TextButton("OK", on_click=close_dialog)]
         )
@@ -601,23 +850,122 @@ class EpubizonApp:
         self.status_bar.value = message
         if hasattr(self, 'page'):
             self.page.update()
+            
+    def save_temp_image(self, data_uri: str) -> Optional[str]:
+        """Salva imagem temporariamente e retorna o caminho"""
+        try:
+            # Extrair dados base64
+            if not data_uri.startswith('data:'):
+                return None
+                
+            header, data = data_uri.split(',', 1)
+            
+            # Determinar extensão
+            if 'image/jpeg' in header or 'image/jpg' in header:
+                ext = '.jpg'
+            elif 'image/png' in header:
+                ext = '.png'
+            elif 'image/gif' in header:
+                ext = '.gif'
+            else:
+                ext = '.jpg'  # fallback
+            
+            # Decodificar base64
+            image_data = base64.b64decode(data)
+            
+            # Criar arquivo temporário
+            image_id = str(uuid.uuid4())
+            temp_path = os.path.join(self.temp_dir, f"{image_id}{ext}")
+            
+            with open(temp_path, 'wb') as f:
+                f.write(image_data)
+            
+            # Armazenar referência
+            self.temp_images[image_id] = temp_path
+            print(f"Imagem salva temporariamente: {temp_path}")
+            
+            return temp_path
+            
+        except Exception as e:
+            print(f"Erro ao salvar imagem temporária: {e}")
+            return None
+            
+    def cleanup_temp_images(self):
+        """Limpa imagens temporárias"""
+        try:
+            import shutil
+            if hasattr(self, 'temp_dir') and os.path.exists(self.temp_dir):
+                shutil.rmtree(self.temp_dir)
+                print("Diretório temporário limpo")
+        except Exception as e:
+            print(f"Erro ao limpar imagens temporárias: {e}")
+            
+    def on_keyboard_event(self, e: ft.KeyboardEvent):
+        """Handles keyboard shortcuts"""
+        if e.key == "Arrow Left" and not e.ctrl and not e.alt and not e.shift:
+            self.prev_chapter(None)
+        elif e.key == "Arrow Right" and not e.ctrl and not e.alt and not e.shift:
+            self.next_chapter(None)
+        elif e.key == "Arrow Up" and not e.ctrl and not e.alt and not e.shift:
+            self.prev_chapter(None)
+        elif e.key == "Arrow Down" and not e.ctrl and not e.alt and not e.shift:
+            self.next_chapter(None)
+        elif e.key == "F1":
+            self.summarize_chapter(None)
+        elif e.key == "O" and e.ctrl:
+            # Open file shortcut
+            self.file_picker.pick_files(
+                allowed_extensions=["epub", "pdf"],
+                dialog_title="Selecionar arquivo EPUB ou PDF"
+            )
+            
+    def on_window_event(self, e):
+        """Handle window events"""
+        if e.data == "close":
+            print("Aplicação sendo fechada, limpando recursos...")
+            self.cleanup_temp_images()
 
 
 def main(page: ft.Page):
-    EpubizonApp(page)
+    try:
+        print("Iniciando aplicação...")
+        app = EpubizonApp(page)
+        print("Aplicação iniciada com sucesso")
+        return app
+    except Exception as e:
+        print(f"ERRO CRÍTICO ao iniciar aplicação: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Mostrar erro na página se possível
+        try:
+            page.add(ft.Text(f"ERRO: {str(e)}", color=ft.Colors.RED))
+            page.update()
+        except:
+            pass
 
 
 if __name__ == "__main__":
-    # Try different modes based on environment
-    import os
-    if os.environ.get('WSL_DISTRO_NAME'):
-        # Running in WSL - try desktop mode first, fallback to web
-        try:
+    print("=== INICIANDO EPUBIZON ===")
+    try:
+        # Try different modes based on environment
+        import os
+        if os.environ.get('WSL_DISTRO_NAME'):
+            # Running in WSL - try desktop mode first, fallback to web
+            try:
+                print("Tentando modo desktop (WSL)...")
+                ft.app(target=main, view=ft.FLET_APP)
+            except Exception as e:
+                print(f"Desktop mode failed: {e}, trying web mode...")
+                print("Open http://localhost:8550 in your Windows browser")
+                ft.app(target=main, view=ft.WEB_BROWSER, port=8550)
+        else:
+            # Not in WSL - use desktop mode
+            print("Tentando modo desktop...")
             ft.app(target=main, view=ft.FLET_APP)
-        except:
-            print("Desktop mode failed, trying web mode...")
-            print("Open http://localhost:8550 in your Windows browser")
-            ft.app(target=main, view=ft.WEB_BROWSER, port=8550)
-    else:
-        # Not in WSL - use desktop mode
-        ft.app(target=main, view=ft.FLET_APP)
+            
+    except Exception as e:
+        print(f"ERRO FATAL: {e}")
+        import traceback
+        traceback.print_exc()
+        input("Pressione Enter para fechar...")

@@ -136,10 +136,13 @@ class EpubHandler:
             
             # Fallback: usar spine se ToC não estiver disponível ou vazio
             if not chapters:
+                print("ToC não encontrada, usando spine items...")
                 spine_items = [item for item in self.book.get_items() if item.get_type() == ebooklib.ITEM_DOCUMENT]
+                print(f"Encontrados {len(spine_items)} spine items")
                 
                 for i, item in enumerate(spine_items):
                     title = self._extract_title_from_content(item) or f'Capítulo {i+1}'
+                    print(f"Spine item {i}: {title} ({item.get_name()})")
                     chapters.append({
                         'title': title,
                         'href': item.get_name(),
@@ -150,8 +153,21 @@ class EpubHandler:
                     
         except Exception as e:
             print(f"Erro ao extrair capítulos: {e}")
-            # Fallback final
-            chapters = [{'title': 'Capítulo 1', 'href': '', 'id': 'chapter-0', 'index': 0}]
+            # Fallback final - tentar pelo menos obter alguns spine items
+            try:
+                spine_items = [item for item in self.book.get_items() if item.get_type() == ebooklib.ITEM_DOCUMENT]
+                if spine_items:
+                    chapters = [{
+                        'title': f'Seção {i+1}',
+                        'href': item.get_name(),
+                        'id': item.get_id() or f'section-{i}',
+                        'index': i,
+                        'item': item
+                    } for i, item in enumerate(spine_items[:10])]  # Limitar a 10 itens
+                else:
+                    chapters = []
+            except:
+                chapters = []
             
         return chapters
         
@@ -192,30 +208,87 @@ class EpubHandler:
             raise IndexError("Índice de capítulo inválido")
             
         chapter = self.chapters[chapter_index]
+        print(f"Carregando capítulo {chapter_index}: {chapter['title']}")
         
         try:
-            # Tentar obter conteúdo pelo href
-            if chapter['href']:
-                item = self.book.get_item_with_href(chapter['href'])
+            # Primeiro, tentar obter pelo href do ToC
+            href = chapter.get('href', '')
+            if href:
+                print(f"Tentando carregar por href: {href}")
+                
+                # Remover âncora se existir (exemplo: file.html#section)
+                base_href = href.split('#')[0]
+                
+                # Tentar obter item pelo href base
+                item = self.book.get_item_with_href(base_href)
                 if item:
-                    return self._process_chapter_content(item)
+                    print(f"Item encontrado: {item.get_name()}")
+                    content = self._process_chapter_content(item)
                     
-            # Tentar obter pelo ID
-            if chapter.get('id'):
-                item = self.book.get_item_with_id(chapter['id'])
-                if item:
-                    return self._process_chapter_content(item)
+                    # Se há uma âncora, tentar encontrar a seção específica
+                    if '#' in href:
+                        anchor = href.split('#')[1]
+                        print(f"Procurando âncora: {anchor}")
+                        content = self._extract_section_content(item, anchor, content)
                     
-            # Tentar usar item armazenado
+                    if content and len(content.strip()) > 20:  # Verificar se há conteúdo suficiente
+                        return content
+                        
+            # Fallback: se não conseguiu pelo ToC, tentar pelo spine item armazenado
             if 'item' in chapter:
+                print("Usando item armazenado do spine")
                 return self._process_chapter_content(chapter['item'])
                 
-            # Fallback para conteúdo genérico
-            return self._generate_mock_content(chapter)
+            # Fallback final: usar o índice do capítulo no spine
+            spine_items = [item for item in self.book.get_items() if item.get_type() == ebooklib.ITEM_DOCUMENT]
+            if chapter_index < len(spine_items):
+                print(f"Usando spine item {chapter_index}")
+                return self._process_chapter_content(spine_items[chapter_index])
+            else:
+                return f"Capítulo {chapter_index + 1} não encontrado no arquivo EPUB."
             
         except Exception as e:
             print(f"Erro ao obter conteúdo do capítulo: {e}")
-            return self._generate_mock_content(chapter)
+            import traceback
+            traceback.print_exc()
+            return f"Erro ao carregar capítulo {chapter_index + 1}: {str(e)}"
+            
+    def _extract_section_content(self, item, anchor: str, full_content: str) -> str:
+        """Extrai conteúdo de uma seção específica usando âncora"""
+        try:
+            content = item.get_content().decode('utf-8')
+            soup = BeautifulSoup(content, 'html.parser')
+            
+            # Procurar elemento com ID correspondente à âncora
+            target_element = soup.find(id=anchor)
+            if target_element:
+                # Coletar conteúdo a partir deste elemento
+                section_content = []
+                current = target_element
+                
+                # Incluir o próprio elemento e próximos elementos até encontrar outro cabeçalho
+                while current:
+                    if current.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] and current != target_element:
+                        break  # Parar no próximo cabeçalho
+                    
+                    if hasattr(current, 'get_text'):
+                        text = current.get_text().strip()
+                        if text:
+                            section_content.append(text)
+                    
+                    current = current.find_next_sibling()
+                
+                if section_content:
+                    result = '\n\n'.join(section_content)
+                    # Processar imagens nesta seção
+                    self._process_images_in_content(soup)
+                    return self._html_to_text(soup)
+                    
+        except Exception as e:
+            print(f"Erro ao extrair seção {anchor}: {e}")
+        
+        # Se não conseguiu extrair a seção específica, retornar conteúdo completo
+        return full_content
             
     def _process_chapter_content(self, item) -> str:
         """Processa o conteúdo de um capítulo"""
@@ -226,29 +299,73 @@ class EpubHandler:
             # Remover elementos desnecessários
             for tag in soup.find_all(['script', 'style', 'head']):
                 tag.decompose()
-                
-            # Processar imagens
+            
+            # Processar imagens primeiro
             self._process_images_in_content(soup)
             
-            # Extrair texto limpo
-            text_content = soup.get_text()
-            
-            # Limpar formatação
-            text_content = re.sub(r'\n\s*\n', '\n\n', text_content)  # Normalizar quebras
-            text_content = re.sub(r'[ \t]+', ' ', text_content)       # Normalizar espaços
-            text_content = text_content.strip()
+            # Converter HTML para texto preservando estrutura
+            text_content = self._html_to_text(soup)
             
             return text_content
             
         except Exception as e:
             print(f"Erro ao processar conteúdo: {e}")
-            return f"Conteúdo não disponível: {str(e)}"
+            return f"Erro ao processar capítulo: {str(e)}"
+            
+    def _html_to_text(self, soup: BeautifulSoup) -> str:
+        """Converte HTML para texto preservando estrutura e imagens"""
+        result_parts = []
+        
+        for element in soup.find_all(['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br', 'img']):
+            if element.name == 'img':
+                data_src = element.get('data-src')
+                if data_src:
+                    result_parts.append(f"\n[IMAGE_DATA:{data_src}]\n")
+                else:
+                    alt_text = element.get('alt', 'Imagem')
+                    result_parts.append(f"\n[IMAGEM: {alt_text}]\n")
+            elif element.name == 'br':
+                result_parts.append('\n')
+            elif element.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                text = element.get_text().strip()
+                if text:
+                    result_parts.append(f'\n\n{text}\n\n')
+            else:  # p, div
+                text = element.get_text().strip()
+                if text:
+                    result_parts.append(f'{text}\n\n')
+        
+        # Se não encontrou elementos estruturados, extrair todo o texto
+        if not result_parts:
+            result_parts.append(soup.get_text())
+        
+        # Juntar e limpar
+        full_text = ''.join(result_parts)
+        
+        # Limpar formatação
+        full_text = re.sub(r'\n\s*\n\s*\n+', '\n\n', full_text)  # Múltiplas quebras
+        full_text = re.sub(r'[ \t]+', ' ', full_text)  # Espaços extras
+        full_text = full_text.strip()
+        
+        return full_text
             
     def _process_images_in_content(self, soup: BeautifulSoup):
         """Processa imagens no conteúdo HTML"""
         try:
             for img in soup.find_all('img'):
                 src = img.get('src', '')
+                
+                # Limpar src de possíveis caminhos relativos
+                if src.startswith('./'):
+                    src = src[2:]
+                elif src.startswith('../'):
+                    # Para caminhos com ../ tentar encontrar a imagem
+                    base_name = src.split('/')[-1]
+                    for img_name in self.images.keys():
+                        if img_name.endswith(base_name):
+                            src = img_name
+                            break
+                
                 if src and src in self.images:
                     # Converter imagem para base64
                     image_data = self.images[src]
@@ -256,38 +373,30 @@ class EpubHandler:
                         # Tentar determinar formato da imagem
                         with Image.open(io.BytesIO(image_data)) as pil_image:
                             format_name = pil_image.format.lower()
+                            if format_name == 'jpeg':
+                                format_name = 'jpg'
                             mime_type = f"image/{format_name}"
                             
                         # Codificar em base64
                         base64_data = base64.b64encode(image_data).decode('utf-8')
                         data_uri = f"data:{mime_type};base64,{base64_data}"
                         
-                        # Criar elemento de placeholder para imagem
-                        img.replace_with(soup.new_string(f"\n[IMAGEM: {src}]\n"))
+                        # Armazenar data URI
+                        img['data-src'] = data_uri
+                        img['data-original-src'] = src
+                        print(f"Processada imagem: {src} -> data URI de {len(data_uri)} chars")
                         
                     except Exception as img_error:
                         print(f"Erro ao processar imagem {src}: {img_error}")
-                        img.replace_with(soup.new_string(f"\n[IMAGEM: {src}]\n"))
+                        img['alt'] = f'Erro ao carregar: {src}'
+                else:
+                    print(f"Imagem não encontrada: {src}")
+                    print(f"Imagens disponíveis: {list(self.images.keys())[:5]}...")  # Mostrar apenas 5 primeiras
+                    img['alt'] = f'Imagem não encontrada: {src}'
                         
         except Exception as e:
             print(f"Erro ao processar imagens: {e}")
             
-    def _generate_mock_content(self, chapter: Dict[str, Any]) -> str:
-        """Gera conteúdo mock para demonstração"""
-        title = chapter.get('title', 'Capítulo')
-        return f"""
-        {title}
-        
-        Este é o conteúdo do {title.lower()}. Em uma implementação real, este texto seria extraído diretamente do arquivo EPUB.
-        
-        O capítulo contém informações detalhadas sobre o tópico, com múltiplas seções e subseções. Inclui exemplos, explicações e orientações práticas para os leitores.
-        
-        Este conteúdo representa o texto real que seria usado para gerar resumos significativos usando IA.
-        
-        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-        
-        Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-        """.strip()
         
     def get_chapter_text_for_summary(self, chapter_index: int) -> str:
         """Obtém texto do capítulo otimizado para resumo"""
