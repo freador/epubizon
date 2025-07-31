@@ -30,7 +30,9 @@
       "Bash(mv:*)",
       "Bash(timeout:*)",
       "Bash(del test_pdf_debug.py test_simple_pdf.py)",
-      "Bash(del:*)"
+      "Bash(del:*)",
+      "Bash(flet:*)",
+      "Bash(activate)"
     ],
     "deny": []
   }
